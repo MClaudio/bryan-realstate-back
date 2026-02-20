@@ -1,0 +1,36 @@
+import { PropertyStatus, PropertyType, Topography, Zone } from '@prisma/client';
+export declare class CreatePropertyDto {
+    code: string;
+    address: string;
+    locationUrl: string;
+    constructionArea: number;
+    landArea: number;
+    hasBasicServices?: boolean;
+    basicServices: string[];
+    features?: string;
+    propertyType: PropertyType;
+    constructionYears?: number;
+    latitude: number;
+    longitude: number;
+    topography: Topography;
+    zone: Zone;
+    cityTime?: number;
+    observations?: string;
+    status?: PropertyStatus;
+    advisorId: string;
+    owner?: string;
+    price: number;
+    maxPrice?: number;
+    minPrice: number;
+    commission: number;
+    salePrice?: number;
+    isPublic?: boolean;
+    isActive?: boolean;
+    isFeatured?: boolean;
+    facebookUrl?: string;
+    tiktokUrl?: string;
+    instagramUrl?: string;
+    youtubeUrl?: string;
+    fileIds?: string[];
+    documentFileIds?: string[];
+}

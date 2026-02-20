@@ -1,0 +1,115 @@
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { PrismaService } from '../prisma/prisma.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
+export declare class UsersService {
+    private prisma;
+    constructor(prisma: PrismaService);
+    create(createUserDto: CreateUserDto): Promise<{
+        firstName: string;
+        lastName: string;
+        username: string;
+        email: string;
+        password: string;
+        phone: string | null;
+        address: string | null;
+        ruc: string;
+        type: import("@prisma/client").$Enums.UserType;
+        id: string;
+        hasChangedDefaultPassword: boolean;
+        resetPasswordToken: string | null;
+        resetPasswordExpires: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
+    findAll(): Promise<{
+        firstName: string;
+        lastName: string;
+        username: string;
+        email: string;
+        phone: string | null;
+        address: string | null;
+        ruc: string;
+        type: import("@prisma/client").$Enums.UserType;
+        id: string;
+        hasChangedDefaultPassword: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+    }[]>;
+    findOne(id: string): Promise<{
+        firstName: string;
+        lastName: string;
+        username: string;
+        email: string;
+        phone: string | null;
+        address: string | null;
+        ruc: string;
+        type: import("@prisma/client").$Enums.UserType;
+        id: string;
+        hasChangedDefaultPassword: boolean;
+        resetPasswordToken: string | null;
+        resetPasswordExpires: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
+    findByUsername(username: string): Promise<{
+        firstName: string;
+        lastName: string;
+        username: string;
+        email: string;
+        password: string;
+        phone: string | null;
+        address: string | null;
+        ruc: string;
+        type: import("@prisma/client").$Enums.UserType;
+        id: string;
+        hasChangedDefaultPassword: boolean;
+        resetPasswordToken: string | null;
+        resetPasswordExpires: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+    } | null>;
+    update(id: string, updateUserDto: UpdateUserDto): Promise<{
+        firstName: string;
+        lastName: string;
+        username: string;
+        email: string;
+        password: string;
+        phone: string | null;
+        address: string | null;
+        ruc: string;
+        type: import("@prisma/client").$Enums.UserType;
+        id: string;
+        hasChangedDefaultPassword: boolean;
+        resetPasswordToken: string | null;
+        resetPasswordExpires: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
+    remove(id: string): Promise<{
+        firstName: string;
+        lastName: string;
+        username: string;
+        email: string;
+        password: string;
+        phone: string | null;
+        address: string | null;
+        ruc: string;
+        type: import("@prisma/client").$Enums.UserType;
+        id: string;
+        hasChangedDefaultPassword: boolean;
+        resetPasswordToken: string | null;
+        resetPasswordExpires: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
+    changePassword(id: string, dto: ChangePasswordDto, requester: {
+        sub: string;
+        type: string;
+    }): Promise<{
+        username: string;
+        id: string;
+        hasChangedDefaultPassword: boolean;
+        updatedAt: Date;
+    }>;
+}

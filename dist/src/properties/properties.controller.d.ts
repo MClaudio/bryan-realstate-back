@@ -1,0 +1,464 @@
+import { PropertiesService } from './properties.service';
+import { CreatePropertyDto } from './dto/create-property.dto';
+import { UpdatePropertyDto } from './dto/update-property.dto';
+export declare class PropertiesController {
+    private readonly propertiesService;
+    constructor(propertiesService: PropertiesService);
+    create(createPropertyDto: CreatePropertyDto): Promise<{
+        advisor: {
+            firstName: string;
+            lastName: string;
+            id: string;
+        };
+        files: ({
+            file: {
+                path: string;
+                id: string;
+                createdAt: Date;
+                updatedAt: Date;
+                originalName: string;
+                fileName: string;
+                size: number;
+                description: string | null;
+            };
+        } & {
+            createdAt: Date;
+            fileType: import("@prisma/client").$Enums.FileType;
+            fileId: string;
+            propertyId: string;
+        })[];
+    } & {
+        address: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        code: string;
+        locationUrl: string;
+        constructionArea: import("@prisma/client-runtime-utils").Decimal;
+        landArea: import("@prisma/client-runtime-utils").Decimal;
+        hasBasicServices: boolean;
+        basicServices: import("@prisma/client/runtime/client").JsonValue;
+        features: string | null;
+        propertyType: import("@prisma/client").$Enums.PropertyType;
+        constructionYears: number | null;
+        latitude: import("@prisma/client-runtime-utils").Decimal;
+        longitude: import("@prisma/client-runtime-utils").Decimal;
+        topography: import("@prisma/client").$Enums.Topography;
+        zone: import("@prisma/client").$Enums.Zone;
+        cityTime: number | null;
+        observations: string | null;
+        status: import("@prisma/client").$Enums.PropertyStatus;
+        advisorId: string;
+        owner: string | null;
+        price: import("@prisma/client-runtime-utils").Decimal;
+        maxPrice: import("@prisma/client-runtime-utils").Decimal | null;
+        minPrice: import("@prisma/client-runtime-utils").Decimal;
+        commission: import("@prisma/client-runtime-utils").Decimal;
+        salePrice: import("@prisma/client-runtime-utils").Decimal | null;
+        isPublic: boolean;
+        isActive: boolean;
+        isFeatured: boolean;
+        facebookUrl: string | null;
+        tiktokUrl: string | null;
+        instagramUrl: string | null;
+        youtubeUrl: string | null;
+        deletedAt: Date | null;
+    }>;
+    findAll(): Promise<({
+        advisor: {
+            firstName: string;
+            lastName: string;
+            id: string;
+        };
+        files: ({
+            file: {
+                path: string;
+                id: string;
+                createdAt: Date;
+                updatedAt: Date;
+                originalName: string;
+                fileName: string;
+                size: number;
+                description: string | null;
+            };
+        } & {
+            createdAt: Date;
+            fileType: import("@prisma/client").$Enums.FileType;
+            fileId: string;
+            propertyId: string;
+        })[];
+    } & {
+        address: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        code: string;
+        locationUrl: string;
+        constructionArea: import("@prisma/client-runtime-utils").Decimal;
+        landArea: import("@prisma/client-runtime-utils").Decimal;
+        hasBasicServices: boolean;
+        basicServices: import("@prisma/client/runtime/client").JsonValue;
+        features: string | null;
+        propertyType: import("@prisma/client").$Enums.PropertyType;
+        constructionYears: number | null;
+        latitude: import("@prisma/client-runtime-utils").Decimal;
+        longitude: import("@prisma/client-runtime-utils").Decimal;
+        topography: import("@prisma/client").$Enums.Topography;
+        zone: import("@prisma/client").$Enums.Zone;
+        cityTime: number | null;
+        observations: string | null;
+        status: import("@prisma/client").$Enums.PropertyStatus;
+        advisorId: string;
+        owner: string | null;
+        price: import("@prisma/client-runtime-utils").Decimal;
+        maxPrice: import("@prisma/client-runtime-utils").Decimal | null;
+        minPrice: import("@prisma/client-runtime-utils").Decimal;
+        commission: import("@prisma/client-runtime-utils").Decimal;
+        salePrice: import("@prisma/client-runtime-utils").Decimal | null;
+        isPublic: boolean;
+        isActive: boolean;
+        isFeatured: boolean;
+        facebookUrl: string | null;
+        tiktokUrl: string | null;
+        instagramUrl: string | null;
+        youtubeUrl: string | null;
+        deletedAt: Date | null;
+    })[]>;
+    findAllPublic(): Promise<({
+        advisor: {
+            firstName: string;
+            lastName: string;
+            id: string;
+        };
+        files: ({
+            file: {
+                path: string;
+                id: string;
+                createdAt: Date;
+                updatedAt: Date;
+                originalName: string;
+                fileName: string;
+                size: number;
+                description: string | null;
+            };
+        } & {
+            createdAt: Date;
+            fileType: import("@prisma/client").$Enums.FileType;
+            fileId: string;
+            propertyId: string;
+        })[];
+    } & {
+        address: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        code: string;
+        locationUrl: string;
+        constructionArea: import("@prisma/client-runtime-utils").Decimal;
+        landArea: import("@prisma/client-runtime-utils").Decimal;
+        hasBasicServices: boolean;
+        basicServices: import("@prisma/client/runtime/client").JsonValue;
+        features: string | null;
+        propertyType: import("@prisma/client").$Enums.PropertyType;
+        constructionYears: number | null;
+        latitude: import("@prisma/client-runtime-utils").Decimal;
+        longitude: import("@prisma/client-runtime-utils").Decimal;
+        topography: import("@prisma/client").$Enums.Topography;
+        zone: import("@prisma/client").$Enums.Zone;
+        cityTime: number | null;
+        observations: string | null;
+        status: import("@prisma/client").$Enums.PropertyStatus;
+        advisorId: string;
+        owner: string | null;
+        price: import("@prisma/client-runtime-utils").Decimal;
+        maxPrice: import("@prisma/client-runtime-utils").Decimal | null;
+        minPrice: import("@prisma/client-runtime-utils").Decimal;
+        commission: import("@prisma/client-runtime-utils").Decimal;
+        salePrice: import("@prisma/client-runtime-utils").Decimal | null;
+        isPublic: boolean;
+        isActive: boolean;
+        isFeatured: boolean;
+        facebookUrl: string | null;
+        tiktokUrl: string | null;
+        instagramUrl: string | null;
+        youtubeUrl: string | null;
+        deletedAt: Date | null;
+    })[]>;
+    findFeatured(): Promise<({
+        advisor: {
+            firstName: string;
+            lastName: string;
+            id: string;
+        };
+        files: ({
+            file: {
+                path: string;
+                id: string;
+                createdAt: Date;
+                updatedAt: Date;
+                originalName: string;
+                fileName: string;
+                size: number;
+                description: string | null;
+            };
+        } & {
+            createdAt: Date;
+            fileType: import("@prisma/client").$Enums.FileType;
+            fileId: string;
+            propertyId: string;
+        })[];
+    } & {
+        address: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        code: string;
+        locationUrl: string;
+        constructionArea: import("@prisma/client-runtime-utils").Decimal;
+        landArea: import("@prisma/client-runtime-utils").Decimal;
+        hasBasicServices: boolean;
+        basicServices: import("@prisma/client/runtime/client").JsonValue;
+        features: string | null;
+        propertyType: import("@prisma/client").$Enums.PropertyType;
+        constructionYears: number | null;
+        latitude: import("@prisma/client-runtime-utils").Decimal;
+        longitude: import("@prisma/client-runtime-utils").Decimal;
+        topography: import("@prisma/client").$Enums.Topography;
+        zone: import("@prisma/client").$Enums.Zone;
+        cityTime: number | null;
+        observations: string | null;
+        status: import("@prisma/client").$Enums.PropertyStatus;
+        advisorId: string;
+        owner: string | null;
+        price: import("@prisma/client-runtime-utils").Decimal;
+        maxPrice: import("@prisma/client-runtime-utils").Decimal | null;
+        minPrice: import("@prisma/client-runtime-utils").Decimal;
+        commission: import("@prisma/client-runtime-utils").Decimal;
+        salePrice: import("@prisma/client-runtime-utils").Decimal | null;
+        isPublic: boolean;
+        isActive: boolean;
+        isFeatured: boolean;
+        facebookUrl: string | null;
+        tiktokUrl: string | null;
+        instagramUrl: string | null;
+        youtubeUrl: string | null;
+        deletedAt: Date | null;
+    })[]>;
+    findOnePublic(id: string): Promise<{
+        advisor: {
+            firstName: string;
+            lastName: string;
+            id: string;
+        };
+        files: ({
+            file: {
+                path: string;
+                id: string;
+                createdAt: Date;
+                updatedAt: Date;
+                originalName: string;
+                fileName: string;
+                size: number;
+                description: string | null;
+            };
+        } & {
+            createdAt: Date;
+            fileType: import("@prisma/client").$Enums.FileType;
+            fileId: string;
+            propertyId: string;
+        })[];
+    } & {
+        address: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        code: string;
+        locationUrl: string;
+        constructionArea: import("@prisma/client-runtime-utils").Decimal;
+        landArea: import("@prisma/client-runtime-utils").Decimal;
+        hasBasicServices: boolean;
+        basicServices: import("@prisma/client/runtime/client").JsonValue;
+        features: string | null;
+        propertyType: import("@prisma/client").$Enums.PropertyType;
+        constructionYears: number | null;
+        latitude: import("@prisma/client-runtime-utils").Decimal;
+        longitude: import("@prisma/client-runtime-utils").Decimal;
+        topography: import("@prisma/client").$Enums.Topography;
+        zone: import("@prisma/client").$Enums.Zone;
+        cityTime: number | null;
+        observations: string | null;
+        status: import("@prisma/client").$Enums.PropertyStatus;
+        advisorId: string;
+        owner: string | null;
+        price: import("@prisma/client-runtime-utils").Decimal;
+        maxPrice: import("@prisma/client-runtime-utils").Decimal | null;
+        minPrice: import("@prisma/client-runtime-utils").Decimal;
+        commission: import("@prisma/client-runtime-utils").Decimal;
+        salePrice: import("@prisma/client-runtime-utils").Decimal | null;
+        isPublic: boolean;
+        isActive: boolean;
+        isFeatured: boolean;
+        facebookUrl: string | null;
+        tiktokUrl: string | null;
+        instagramUrl: string | null;
+        youtubeUrl: string | null;
+        deletedAt: Date | null;
+    }>;
+    findOne(id: string): Promise<{
+        advisor: {
+            firstName: string;
+            lastName: string;
+            id: string;
+        };
+        files: ({
+            file: {
+                path: string;
+                id: string;
+                createdAt: Date;
+                updatedAt: Date;
+                originalName: string;
+                fileName: string;
+                size: number;
+                description: string | null;
+            };
+        } & {
+            createdAt: Date;
+            fileType: import("@prisma/client").$Enums.FileType;
+            fileId: string;
+            propertyId: string;
+        })[];
+    } & {
+        address: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        code: string;
+        locationUrl: string;
+        constructionArea: import("@prisma/client-runtime-utils").Decimal;
+        landArea: import("@prisma/client-runtime-utils").Decimal;
+        hasBasicServices: boolean;
+        basicServices: import("@prisma/client/runtime/client").JsonValue;
+        features: string | null;
+        propertyType: import("@prisma/client").$Enums.PropertyType;
+        constructionYears: number | null;
+        latitude: import("@prisma/client-runtime-utils").Decimal;
+        longitude: import("@prisma/client-runtime-utils").Decimal;
+        topography: import("@prisma/client").$Enums.Topography;
+        zone: import("@prisma/client").$Enums.Zone;
+        cityTime: number | null;
+        observations: string | null;
+        status: import("@prisma/client").$Enums.PropertyStatus;
+        advisorId: string;
+        owner: string | null;
+        price: import("@prisma/client-runtime-utils").Decimal;
+        maxPrice: import("@prisma/client-runtime-utils").Decimal | null;
+        minPrice: import("@prisma/client-runtime-utils").Decimal;
+        commission: import("@prisma/client-runtime-utils").Decimal;
+        salePrice: import("@prisma/client-runtime-utils").Decimal | null;
+        isPublic: boolean;
+        isActive: boolean;
+        isFeatured: boolean;
+        facebookUrl: string | null;
+        tiktokUrl: string | null;
+        instagramUrl: string | null;
+        youtubeUrl: string | null;
+        deletedAt: Date | null;
+    }>;
+    update(id: string, updatePropertyDto: UpdatePropertyDto): Promise<{
+        advisor: {
+            firstName: string;
+            lastName: string;
+            id: string;
+        };
+        files: ({
+            file: {
+                path: string;
+                id: string;
+                createdAt: Date;
+                updatedAt: Date;
+                originalName: string;
+                fileName: string;
+                size: number;
+                description: string | null;
+            };
+        } & {
+            createdAt: Date;
+            fileType: import("@prisma/client").$Enums.FileType;
+            fileId: string;
+            propertyId: string;
+        })[];
+    } & {
+        address: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        code: string;
+        locationUrl: string;
+        constructionArea: import("@prisma/client-runtime-utils").Decimal;
+        landArea: import("@prisma/client-runtime-utils").Decimal;
+        hasBasicServices: boolean;
+        basicServices: import("@prisma/client/runtime/client").JsonValue;
+        features: string | null;
+        propertyType: import("@prisma/client").$Enums.PropertyType;
+        constructionYears: number | null;
+        latitude: import("@prisma/client-runtime-utils").Decimal;
+        longitude: import("@prisma/client-runtime-utils").Decimal;
+        topography: import("@prisma/client").$Enums.Topography;
+        zone: import("@prisma/client").$Enums.Zone;
+        cityTime: number | null;
+        observations: string | null;
+        status: import("@prisma/client").$Enums.PropertyStatus;
+        advisorId: string;
+        owner: string | null;
+        price: import("@prisma/client-runtime-utils").Decimal;
+        maxPrice: import("@prisma/client-runtime-utils").Decimal | null;
+        minPrice: import("@prisma/client-runtime-utils").Decimal;
+        commission: import("@prisma/client-runtime-utils").Decimal;
+        salePrice: import("@prisma/client-runtime-utils").Decimal | null;
+        isPublic: boolean;
+        isActive: boolean;
+        isFeatured: boolean;
+        facebookUrl: string | null;
+        tiktokUrl: string | null;
+        instagramUrl: string | null;
+        youtubeUrl: string | null;
+        deletedAt: Date | null;
+    }>;
+    remove(id: string): Promise<{
+        address: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        code: string;
+        locationUrl: string;
+        constructionArea: import("@prisma/client-runtime-utils").Decimal;
+        landArea: import("@prisma/client-runtime-utils").Decimal;
+        hasBasicServices: boolean;
+        basicServices: import("@prisma/client/runtime/client").JsonValue;
+        features: string | null;
+        propertyType: import("@prisma/client").$Enums.PropertyType;
+        constructionYears: number | null;
+        latitude: import("@prisma/client-runtime-utils").Decimal;
+        longitude: import("@prisma/client-runtime-utils").Decimal;
+        topography: import("@prisma/client").$Enums.Topography;
+        zone: import("@prisma/client").$Enums.Zone;
+        cityTime: number | null;
+        observations: string | null;
+        status: import("@prisma/client").$Enums.PropertyStatus;
+        advisorId: string;
+        owner: string | null;
+        price: import("@prisma/client-runtime-utils").Decimal;
+        maxPrice: import("@prisma/client-runtime-utils").Decimal | null;
+        minPrice: import("@prisma/client-runtime-utils").Decimal;
+        commission: import("@prisma/client-runtime-utils").Decimal;
+        salePrice: import("@prisma/client-runtime-utils").Decimal | null;
+        isPublic: boolean;
+        isActive: boolean;
+        isFeatured: boolean;
+        facebookUrl: string | null;
+        tiktokUrl: string | null;
+        instagramUrl: string | null;
+        youtubeUrl: string | null;
+        deletedAt: Date | null;
+    }>;
+}
