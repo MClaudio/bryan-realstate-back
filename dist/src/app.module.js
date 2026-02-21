@@ -17,6 +17,7 @@ const properties_module_1 = require("./properties/properties.module");
 const files_module_1 = require("./files/files.module");
 const configurations_module_1 = require("./configurations/configurations.module");
 const dashboard_module_1 = require("./dashboard/dashboard.module");
+const processes_module_1 = require("./processes/processes.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -32,6 +33,7 @@ exports.AppModule = AppModule = __decorate([
             files_module_1.FilesModule,
             configurations_module_1.ConfigurationsModule,
             dashboard_module_1.DashboardModule,
+            processes_module_1.ProcessesModule,
         ],
         controllers: [],
         providers: [],

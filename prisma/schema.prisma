@@ -88,6 +88,7 @@ model Property {
   isFeatured        Boolean        @default(false) @map("is_featured")
   advisor           User           @relation(fields: [advisorId], references: [id])
   files             PropertyFile[]
+  processes         Process[]
 
   @@index([code])
   @@map("properties")
@@ -104,6 +105,7 @@ model File {
   updatedAt     DateTime       @updatedAt @map("updated_at")
   configuration Configuration?
   propertyFiles PropertyFile[]
+  processFiles  ProcessFile[]
 
   @@map("files")
 }
@@ -176,4 +178,37 @@ enum PropertyStatus {
 enum FileType {
   image
   document
+}
+
+model Process {
+  id              String        @id @default(uuid()) @db.Uuid
+  propertyId      String        @map("property_id") @db.Uuid
+  title           String
+  type            ProcessType
+  description     String
+  expenses        Json          @default("[]")
+  approximateTime String?       @map("approximate_time")
+  nextStep        String?       @map("next_step")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+  property        Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  files           ProcessFile[]
+
+  @@map("processes")
+}
+
+model ProcessFile {
+  processId String   @map("process_id") @db.Uuid
+  fileId    String   @map("file_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+  file      File     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  process   Process  @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  @@id([processId, fileId])
+  @@map("process_files")
+}
+
+enum ProcessType {
+  Comprador
+  Vendedor
 }

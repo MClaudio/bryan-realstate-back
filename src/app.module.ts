@@ -8,6 +8,7 @@ import { PropertiesModule } from './properties/properties.module';
 import { FilesModule } from './files/files.module';
 import { ConfigurationsModule } from './configurations/configurations.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { ProcessesModule } from './processes/processes.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     FilesModule,
     ConfigurationsModule,
     DashboardModule,
+    ProcessesModule,
   ],
   controllers: [],
   providers: [],
