@@ -47,6 +47,7 @@ class CreatePropertyDto {
     youtubeUrl;
     fileIds;
     documentFileIds;
+    negotiationClientId;
 }
 exports.CreatePropertyDto = CreatePropertyDto;
 __decorate([
@@ -226,4 +227,9 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Array)
 ], CreatePropertyDto.prototype, "documentFileIds", void 0);
+__decorate([
+    (0, class_validator_1.IsUUID)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreatePropertyDto.prototype, "negotiationClientId", void 0);
 //# sourceMappingURL=create-property.dto.js.map

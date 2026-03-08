@@ -6,6 +6,7 @@ export declare class UsersController {
     private readonly usersService;
     constructor(usersService: UsersService);
     create(createUserDto: CreateUserDto): Promise<{
+        id: string;
         firstName: string;
         lastName: string;
         username: string;
@@ -15,7 +16,6 @@ export declare class UsersController {
         address: string | null;
         ruc: string;
         type: import("@prisma/client").$Enums.UserType;
-        id: string;
         hasChangedDefaultPassword: boolean;
         resetPasswordToken: string | null;
         resetPasswordExpires: Date | null;
@@ -23,6 +23,7 @@ export declare class UsersController {
         updatedAt: Date;
     }>;
     findAll(): Promise<{
+        id: string;
         firstName: string;
         lastName: string;
         username: string;
@@ -31,12 +32,12 @@ export declare class UsersController {
         address: string | null;
         ruc: string;
         type: import("@prisma/client").$Enums.UserType;
-        id: string;
         hasChangedDefaultPassword: boolean;
         createdAt: Date;
         updatedAt: Date;
     }[]>;
     findOne(id: string): Promise<{
+        id: string;
         firstName: string;
         lastName: string;
         username: string;
@@ -45,7 +46,6 @@ export declare class UsersController {
         address: string | null;
         ruc: string;
         type: import("@prisma/client").$Enums.UserType;
-        id: string;
         hasChangedDefaultPassword: boolean;
         resetPasswordToken: string | null;
         resetPasswordExpires: Date | null;
@@ -53,6 +53,7 @@ export declare class UsersController {
         updatedAt: Date;
     }>;
     update(id: string, updateUserDto: UpdateUserDto): Promise<{
+        id: string;
         firstName: string;
         lastName: string;
         username: string;
@@ -62,7 +63,6 @@ export declare class UsersController {
         address: string | null;
         ruc: string;
         type: import("@prisma/client").$Enums.UserType;
-        id: string;
         hasChangedDefaultPassword: boolean;
         resetPasswordToken: string | null;
         resetPasswordExpires: Date | null;
@@ -70,12 +70,13 @@ export declare class UsersController {
         updatedAt: Date;
     }>;
     updatePassword(id: string, dto: ChangePasswordDto, req: any): Promise<{
-        username: string;
         id: string;
+        username: string;
         hasChangedDefaultPassword: boolean;
         updatedAt: Date;
     }>;
     remove(id: string): Promise<{
+        id: string;
         firstName: string;
         lastName: string;
         username: string;
@@ -85,7 +86,6 @@ export declare class UsersController {
         address: string | null;
         ruc: string;
         type: import("@prisma/client").$Enums.UserType;
-        id: string;
         hasChangedDefaultPassword: boolean;
         resetPasswordToken: string | null;
         resetPasswordExpires: Date | null;

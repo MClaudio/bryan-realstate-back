@@ -6,15 +6,15 @@ export declare class ProcessesController {
     constructor(processesService: ProcessesService);
     create(dto: CreateProcessDto): Promise<{
         property: {
+            address: string;
             id: string;
             code: string;
-            address: string;
         };
         files: ({
             file: {
+                path: string;
                 id: string;
                 originalName: string;
-                path: string;
                 size: number;
             };
         } & {
@@ -23,28 +23,28 @@ export declare class ProcessesController {
             processId: string;
         })[];
     } & {
-        id: string;
-        title: string;
         type: import("@prisma/client").$Enums.ProcessType;
-        description: string;
-        expenses: import("@prisma/client/runtime/client").JsonValue;
-        approximateTime: string | null;
-        nextStep: string | null;
+        id: string;
         createdAt: Date;
         updatedAt: Date;
         propertyId: string;
+        description: string;
+        title: string;
+        expenses: import("@prisma/client/runtime/client").JsonValue;
+        approximateTime: string | null;
+        nextStep: string | null;
     }>;
     findAllByProperty(propertyId: string): Promise<({
         property: {
+            address: string;
             id: string;
             code: string;
-            address: string;
         };
         files: ({
             file: {
+                path: string;
                 id: string;
                 originalName: string;
-                path: string;
                 size: number;
             };
         } & {
@@ -53,28 +53,28 @@ export declare class ProcessesController {
             processId: string;
         })[];
     } & {
-        id: string;
-        title: string;
         type: import("@prisma/client").$Enums.ProcessType;
-        description: string;
-        expenses: import("@prisma/client/runtime/client").JsonValue;
-        approximateTime: string | null;
-        nextStep: string | null;
+        id: string;
         createdAt: Date;
         updatedAt: Date;
         propertyId: string;
+        description: string;
+        title: string;
+        expenses: import("@prisma/client/runtime/client").JsonValue;
+        approximateTime: string | null;
+        nextStep: string | null;
     })[]>;
     findOne(id: string): Promise<{
         property: {
+            address: string;
             id: string;
             code: string;
-            address: string;
         };
         files: ({
             file: {
+                path: string;
                 id: string;
                 originalName: string;
-                path: string;
                 size: number;
             };
         } & {
@@ -83,28 +83,28 @@ export declare class ProcessesController {
             processId: string;
         })[];
     } & {
-        id: string;
-        title: string;
         type: import("@prisma/client").$Enums.ProcessType;
-        description: string;
-        expenses: import("@prisma/client/runtime/client").JsonValue;
-        approximateTime: string | null;
-        nextStep: string | null;
+        id: string;
         createdAt: Date;
         updatedAt: Date;
         propertyId: string;
+        description: string;
+        title: string;
+        expenses: import("@prisma/client/runtime/client").JsonValue;
+        approximateTime: string | null;
+        nextStep: string | null;
     }>;
     update(id: string, dto: UpdateProcessDto): Promise<{
         property: {
+            address: string;
             id: string;
             code: string;
-            address: string;
         };
         files: ({
             file: {
+                path: string;
                 id: string;
                 originalName: string;
-                path: string;
                 size: number;
             };
         } & {
@@ -113,27 +113,27 @@ export declare class ProcessesController {
             processId: string;
         })[];
     } & {
-        id: string;
-        title: string;
         type: import("@prisma/client").$Enums.ProcessType;
-        description: string;
-        expenses: import("@prisma/client/runtime/client").JsonValue;
-        approximateTime: string | null;
-        nextStep: string | null;
+        id: string;
         createdAt: Date;
         updatedAt: Date;
         propertyId: string;
+        description: string;
+        title: string;
+        expenses: import("@prisma/client/runtime/client").JsonValue;
+        approximateTime: string | null;
+        nextStep: string | null;
     }>;
     remove(id: string): Promise<{
-        id: string;
-        title: string;
         type: import("@prisma/client").$Enums.ProcessType;
-        description: string;
-        expenses: import("@prisma/client/runtime/client").JsonValue;
-        approximateTime: string | null;
-        nextStep: string | null;
+        id: string;
         createdAt: Date;
         updatedAt: Date;
         propertyId: string;
+        description: string;
+        title: string;
+        expenses: import("@prisma/client/runtime/client").JsonValue;
+        approximateTime: string | null;
+        nextStep: string | null;
     }>;
 }

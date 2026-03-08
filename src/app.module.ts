@@ -9,6 +9,8 @@ import { FilesModule } from './files/files.module';
 import { ConfigurationsModule } from './configurations/configurations.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ProcessesModule } from './processes/processes.module';
+import { PropertyInterestsModule } from './property-interests/property-interests.module';
+import { BlacklistModule } from './blacklist/blacklist.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { ProcessesModule } from './processes/processes.module';
     ConfigurationsModule,
     DashboardModule,
     ProcessesModule,
+    PropertyInterestsModule,
+    BlacklistModule,
   ],
   controllers: [],
   providers: [],

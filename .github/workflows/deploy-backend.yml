@@ -1,0 +1,90 @@
+name: Build and Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "**"
+      - ".github/workflows/deploy-backend.yml"
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build application
+        run: npm run build
+
+      - name: Add build timestamp
+        run: |
+          echo "Build completed at $(date)" > dist/build-info.txt
+          echo "Commit: ${{ github.sha }}" >> dist/build-info.txt
+
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-dist
+          path: dist/
+          retention-days: 7
+
+      - name: Commit and push built files
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          # Autenticar el remote con el token para poder hacer push
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+
+          git fetch origin main
+
+          # Guardar los cambios generados (dist/) antes del rebase
+          git stash --include-untracked
+
+          git pull --rebase origin main || echo "Nothing to pull"
+
+          # Restaurar los cambios generados
+          git stash pop || true
+
+          git add -f dist/
+
+          if git diff --staged --quiet; then
+            echo "No changes in backend build, skipping deploy"
+            exit 0
+          fi
+
+          BUILD_ID=$(git rev-parse --short HEAD)
+          git commit -m "build(backend): compiled files [${BUILD_ID}] [skip ci]"
+          git push origin main
+
+          echo "Backend build ${BUILD_ID} pushed to main"
+
+      - name: Wait for git sync
+        run: sleep 5
+
+      - name: Trigger EasyPanel deployment
+        # EasyPanel reconstruirá la imagen Docker, la cual ejecuta
+        # "prisma migrate deploy && node dist/main" al arrancar
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          curl -X POST "${{ secrets.EASYPANEL_DEPLOY_BACKEND_WEBHOOK }}"
+
+      - name: Deployment notification
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: echo "Backend deployment triggered successfully to EasyPanel"

@@ -18,6 +18,8 @@ const files_module_1 = require("./files/files.module");
 const configurations_module_1 = require("./configurations/configurations.module");
 const dashboard_module_1 = require("./dashboard/dashboard.module");
 const processes_module_1 = require("./processes/processes.module");
+const property_interests_module_1 = require("./property-interests/property-interests.module");
+const blacklist_module_1 = require("./blacklist/blacklist.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -34,6 +36,8 @@ exports.AppModule = AppModule = __decorate([
             configurations_module_1.ConfigurationsModule,
             dashboard_module_1.DashboardModule,
             processes_module_1.ProcessesModule,
+            property_interests_module_1.PropertyInterestsModule,
+            blacklist_module_1.BlacklistModule,
         ],
         controllers: [],
         providers: [],

@@ -174,4 +174,9 @@ export class UpdatePropertyDto {
   @IsArray()
   @IsOptional()
   documentFileIds?: string[];
+
+  @IsUUID()
+  @IsOptional()
+  @ValidateIf((obj, value) => value !== null && value !== undefined && value !== '')
+  negotiationClientId?: string | null;
 }

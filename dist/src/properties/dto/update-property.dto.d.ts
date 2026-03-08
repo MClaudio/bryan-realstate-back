@@ -33,4 +33,5 @@ export declare class UpdatePropertyDto {
     youtubeUrl?: string;
     fileIds?: string[];
     documentFileIds?: string[];
+    negotiationClientId?: string | null;
 }
