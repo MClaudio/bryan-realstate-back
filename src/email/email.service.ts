@@ -12,7 +12,7 @@ export class EmailService {
 
   constructor(private configService: ConfigService) {
     const host = this.configService.get<string>('MAIL_HOST');
-    const port = this.configService.get<number>('MAIL_PORT');
+    const port = parseInt(this.configService.get<string>('MAIL_PORT') || '587', 10);
     const user = this.configService.get<string>('MAIL_USER');
     const pass = this.configService.get<string>('MAIL_PASSWORD');
     
