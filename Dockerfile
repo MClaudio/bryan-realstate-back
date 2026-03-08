@@ -13,7 +13,7 @@ COPY prisma ./prisma/
 RUN npm install
 
 # Genera el cliente Prisma (no necesita DB real, solo el schema)
-RUN DATABASE_URL="postgresql://x:x@localhost:5432/x" npx prisma generate
+RUN npx prisma generate
 
 # Copia la build precompilada por el CI
 COPY dist ./dist/
