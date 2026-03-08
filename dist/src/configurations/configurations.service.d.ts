@@ -21,12 +21,12 @@ export declare class ConfigurationsService {
     }>;
     findOne(): Promise<({
         logo: {
-            path: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
             originalName: string;
             fileName: string;
+            path: string;
             size: number;
             description: string | null;
         } | null;

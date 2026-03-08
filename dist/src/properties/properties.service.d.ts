@@ -19,12 +19,12 @@ export declare class PropertiesService {
         } | null;
         files: ({
             file: {
-                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
                 description: string | null;
             };
@@ -36,6 +36,7 @@ export declare class PropertiesService {
         })[];
     } & {
         address: string;
+        isActive: boolean;
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -63,7 +64,6 @@ export declare class PropertiesService {
         commission: Prisma.Decimal;
         salePrice: Prisma.Decimal | null;
         isPublic: boolean;
-        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
@@ -86,12 +86,12 @@ export declare class PropertiesService {
         } | null;
         files: ({
             file: {
-                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
                 description: string | null;
             };
@@ -103,6 +103,7 @@ export declare class PropertiesService {
         })[];
     } & {
         address: string;
+        isActive: boolean;
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -130,7 +131,6 @@ export declare class PropertiesService {
         commission: Prisma.Decimal;
         salePrice: Prisma.Decimal | null;
         isPublic: boolean;
-        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
@@ -153,12 +153,12 @@ export declare class PropertiesService {
         } | null;
         files: ({
             file: {
-                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
                 description: string | null;
             };
@@ -170,6 +170,7 @@ export declare class PropertiesService {
         })[];
     } & {
         address: string;
+        isActive: boolean;
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -197,7 +198,6 @@ export declare class PropertiesService {
         commission: Prisma.Decimal;
         salePrice: Prisma.Decimal | null;
         isPublic: boolean;
-        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
@@ -220,12 +220,12 @@ export declare class PropertiesService {
         } | null;
         files: ({
             file: {
-                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
                 description: string | null;
             };
@@ -237,6 +237,7 @@ export declare class PropertiesService {
         })[];
     } & {
         address: string;
+        isActive: boolean;
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -264,7 +265,6 @@ export declare class PropertiesService {
         commission: Prisma.Decimal;
         salePrice: Prisma.Decimal | null;
         isPublic: boolean;
-        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
@@ -287,12 +287,12 @@ export declare class PropertiesService {
         } | null;
         files: ({
             file: {
-                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
                 description: string | null;
             };
@@ -304,6 +304,7 @@ export declare class PropertiesService {
         })[];
     } & {
         address: string;
+        isActive: boolean;
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -331,7 +332,6 @@ export declare class PropertiesService {
         commission: Prisma.Decimal;
         salePrice: Prisma.Decimal | null;
         isPublic: boolean;
-        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
@@ -354,12 +354,12 @@ export declare class PropertiesService {
         } | null;
         files: ({
             file: {
-                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
                 description: string | null;
             };
@@ -371,6 +371,7 @@ export declare class PropertiesService {
         })[];
     } & {
         address: string;
+        isActive: boolean;
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -398,7 +399,6 @@ export declare class PropertiesService {
         commission: Prisma.Decimal;
         salePrice: Prisma.Decimal | null;
         isPublic: boolean;
-        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
@@ -409,6 +409,7 @@ export declare class PropertiesService {
     }>;
     remove(id: string): Promise<{
         address: string;
+        isActive: boolean;
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -436,7 +437,6 @@ export declare class PropertiesService {
         commission: Prisma.Decimal;
         salePrice: Prisma.Decimal | null;
         isPublic: boolean;
-        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;

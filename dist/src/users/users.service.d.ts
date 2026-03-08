@@ -15,6 +15,7 @@ export declare class UsersService {
         address: string | null;
         ruc: string;
         type: import("@prisma/client").$Enums.UserType;
+        isActive: boolean;
         id: string;
         hasChangedDefaultPassword: boolean;
         resetPasswordToken: string | null;
@@ -31,6 +32,7 @@ export declare class UsersService {
         address: string | null;
         ruc: string;
         type: import("@prisma/client").$Enums.UserType;
+        isActive: boolean;
         id: string;
         hasChangedDefaultPassword: boolean;
         createdAt: Date;
@@ -45,6 +47,7 @@ export declare class UsersService {
         address: string | null;
         ruc: string;
         type: import("@prisma/client").$Enums.UserType;
+        isActive: boolean;
         id: string;
         hasChangedDefaultPassword: boolean;
         resetPasswordToken: string | null;
@@ -62,6 +65,7 @@ export declare class UsersService {
         address: string | null;
         ruc: string;
         type: import("@prisma/client").$Enums.UserType;
+        isActive: boolean;
         id: string;
         hasChangedDefaultPassword: boolean;
         resetPasswordToken: string | null;
@@ -79,6 +83,7 @@ export declare class UsersService {
         address: string | null;
         ruc: string;
         type: import("@prisma/client").$Enums.UserType;
+        isActive: boolean;
         id: string;
         hasChangedDefaultPassword: boolean;
         resetPasswordToken: string | null;
@@ -87,21 +92,8 @@ export declare class UsersService {
         updatedAt: Date;
     }>;
     remove(id: string): Promise<{
-        firstName: string;
-        lastName: string;
-        username: string;
-        email: string;
-        password: string;
-        phone: string | null;
-        address: string | null;
-        ruc: string;
-        type: import("@prisma/client").$Enums.UserType;
+        isActive: boolean;
         id: string;
-        hasChangedDefaultPassword: boolean;
-        resetPasswordToken: string | null;
-        resetPasswordExpires: Date | null;
-        createdAt: Date;
-        updatedAt: Date;
     }>;
     changePassword(id: string, dto: ChangePasswordDto, requester: {
         sub: string;

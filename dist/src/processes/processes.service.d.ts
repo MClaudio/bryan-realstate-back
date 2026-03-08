@@ -13,9 +13,9 @@ export declare class ProcessesService {
         };
         files: ({
             file: {
-                path: string;
                 id: string;
                 originalName: string;
+                path: string;
                 size: number;
             };
         } & {
@@ -43,9 +43,9 @@ export declare class ProcessesService {
         };
         files: ({
             file: {
-                path: string;
                 id: string;
                 originalName: string;
+                path: string;
                 size: number;
             };
         } & {
@@ -73,9 +73,9 @@ export declare class ProcessesService {
         };
         files: ({
             file: {
-                path: string;
                 id: string;
                 originalName: string;
+                path: string;
                 size: number;
             };
         } & {
@@ -103,9 +103,9 @@ export declare class ProcessesService {
         };
         files: ({
             file: {
-                path: string;
                 id: string;
                 originalName: string;
+                path: string;
                 size: number;
             };
         } & {

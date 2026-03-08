@@ -86,6 +86,7 @@ let UsersService = class UsersService {
                 address: true,
                 ruc: true,
                 type: true,
+                isActive: true,
                 hasChangedDefaultPassword: true,
                 createdAt: true,
                 updatedAt: true,
@@ -126,8 +127,10 @@ let UsersService = class UsersService {
         const user = await this.prisma.user.findUnique({ where: { id } });
         if (!user)
             throw new common_1.NotFoundException(`User with ID ${id} not found`);
-        return this.prisma.user.delete({
+        return this.prisma.user.update({
             where: { id },
+            data: { isActive: false },
+            select: { id: true, isActive: true },
         });
     }
     async changePassword(id, dto, requester) {
@@ -140,6 +143,9 @@ let UsersService = class UsersService {
             throw new common_1.NotFoundException(`You are not allowed to change this password`);
         }
         if (!isAdmin) {
+            if (!dto.currentPassword) {
+                throw new common_1.ConflictException('La contraseña actual es requerida');
+            }
             const match = await bcrypt.compare(dto.currentPassword, user.password);
             if (!match) {
                 throw new common_1.ConflictException('La contraseña actual es incorrecta');

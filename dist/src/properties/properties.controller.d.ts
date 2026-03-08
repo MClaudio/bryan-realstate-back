@@ -23,12 +23,12 @@ export declare class PropertiesController {
         } | null;
         files: ({
             file: {
-                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
                 description: string | null;
             };
@@ -40,6 +40,7 @@ export declare class PropertiesController {
         })[];
     } & {
         address: string;
+        isActive: boolean;
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -67,7 +68,6 @@ export declare class PropertiesController {
         commission: import("@prisma/client-runtime-utils").Decimal;
         salePrice: import("@prisma/client-runtime-utils").Decimal | null;
         isPublic: boolean;
-        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
@@ -90,12 +90,12 @@ export declare class PropertiesController {
         } | null;
         files: ({
             file: {
-                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
                 description: string | null;
             };
@@ -107,6 +107,7 @@ export declare class PropertiesController {
         })[];
     } & {
         address: string;
+        isActive: boolean;
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -134,7 +135,6 @@ export declare class PropertiesController {
         commission: import("@prisma/client-runtime-utils").Decimal;
         salePrice: import("@prisma/client-runtime-utils").Decimal | null;
         isPublic: boolean;
-        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
@@ -157,12 +157,12 @@ export declare class PropertiesController {
         } | null;
         files: ({
             file: {
-                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
                 description: string | null;
             };
@@ -174,6 +174,7 @@ export declare class PropertiesController {
         })[];
     } & {
         address: string;
+        isActive: boolean;
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -201,7 +202,6 @@ export declare class PropertiesController {
         commission: import("@prisma/client-runtime-utils").Decimal;
         salePrice: import("@prisma/client-runtime-utils").Decimal | null;
         isPublic: boolean;
-        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
@@ -224,12 +224,12 @@ export declare class PropertiesController {
         } | null;
         files: ({
             file: {
-                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
                 description: string | null;
             };
@@ -241,6 +241,7 @@ export declare class PropertiesController {
         })[];
     } & {
         address: string;
+        isActive: boolean;
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -268,7 +269,6 @@ export declare class PropertiesController {
         commission: import("@prisma/client-runtime-utils").Decimal;
         salePrice: import("@prisma/client-runtime-utils").Decimal | null;
         isPublic: boolean;
-        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
@@ -291,12 +291,12 @@ export declare class PropertiesController {
         } | null;
         files: ({
             file: {
-                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
                 description: string | null;
             };
@@ -308,6 +308,7 @@ export declare class PropertiesController {
         })[];
     } & {
         address: string;
+        isActive: boolean;
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -335,7 +336,6 @@ export declare class PropertiesController {
         commission: import("@prisma/client-runtime-utils").Decimal;
         salePrice: import("@prisma/client-runtime-utils").Decimal | null;
         isPublic: boolean;
-        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
@@ -358,12 +358,12 @@ export declare class PropertiesController {
         } | null;
         files: ({
             file: {
-                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
                 description: string | null;
             };
@@ -375,6 +375,7 @@ export declare class PropertiesController {
         })[];
     } & {
         address: string;
+        isActive: boolean;
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -402,7 +403,6 @@ export declare class PropertiesController {
         commission: import("@prisma/client-runtime-utils").Decimal;
         salePrice: import("@prisma/client-runtime-utils").Decimal | null;
         isPublic: boolean;
-        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
@@ -425,12 +425,12 @@ export declare class PropertiesController {
         } | null;
         files: ({
             file: {
-                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
                 description: string | null;
             };
@@ -442,6 +442,7 @@ export declare class PropertiesController {
         })[];
     } & {
         address: string;
+        isActive: boolean;
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -469,7 +470,6 @@ export declare class PropertiesController {
         commission: import("@prisma/client-runtime-utils").Decimal;
         salePrice: import("@prisma/client-runtime-utils").Decimal | null;
         isPublic: boolean;
-        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
@@ -480,6 +480,7 @@ export declare class PropertiesController {
     }>;
     remove(id: string): Promise<{
         address: string;
+        isActive: boolean;
         id: string;
         createdAt: Date;
         updatedAt: Date;
@@ -507,7 +508,6 @@ export declare class PropertiesController {
         commission: import("@prisma/client-runtime-utils").Decimal;
         salePrice: import("@prisma/client-runtime-utils").Decimal | null;
         isPublic: boolean;
-        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
