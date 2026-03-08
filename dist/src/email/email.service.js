@@ -56,7 +56,7 @@ let EmailService = EmailService_1 = class EmailService {
     constructor(configService) {
         this.configService = configService;
         const host = this.configService.get('MAIL_HOST');
-        const port = this.configService.get('MAIL_PORT');
+        const port = parseInt(this.configService.get('MAIL_PORT') || '587', 10);
         const user = this.configService.get('MAIL_USER');
         const pass = this.configService.get('MAIL_PASSWORD');
         this.fromEmail = this.configService.get('MAIL_FROM') || user || 'noreply@bryanrealstate.com';
