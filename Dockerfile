@@ -17,8 +17,10 @@ RUN npm install
 RUN DATABASE_URL="postgresql://x:x@localhost:5432/x" npx prisma generate
 
 # Copia el código fuente y compila dentro del contenedor
+# ARG CACHEBUST invalida el cache de Docker desde este punto en cada deploy
+ARG CACHEBUST=2
 COPY src ./src/
-RUN npm run build
+RUN npm run build && echo "=== Build OK ===" && ls -la dist/
 
 EXPOSE 3000
 
