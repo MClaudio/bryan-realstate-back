@@ -74,6 +74,9 @@ let AuthService = class AuthService {
         if (!user) {
             throw new common_1.UnauthorizedException('Credenciales inválidas');
         }
+        if (user.isActive === false) {
+            throw new common_1.UnauthorizedException('Tu cuenta está desactivada. Contacta al administrador.');
+        }
         const payload = {
             username: user.username,
             sub: user.id,

@@ -33,12 +33,12 @@ export declare class DashboardService {
             };
             files: ({
                 file: {
-                    path: string;
                     id: string;
                     createdAt: Date;
                     updatedAt: Date;
                     originalName: string;
                     fileName: string;
+                    path: string;
                     size: number;
                     description: string | null;
                 };
@@ -50,6 +50,7 @@ export declare class DashboardService {
             })[];
         } & {
             address: string;
+            isActive: boolean;
             id: string;
             createdAt: Date;
             updatedAt: Date;
@@ -77,7 +78,6 @@ export declare class DashboardService {
             commission: import("@prisma/client-runtime-utils").Decimal;
             salePrice: import("@prisma/client-runtime-utils").Decimal | null;
             isPublic: boolean;
-            isActive: boolean;
             isFeatured: boolean;
             facebookUrl: string | null;
             tiktokUrl: string | null;

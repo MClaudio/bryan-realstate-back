@@ -20,6 +20,7 @@ model User {
   ruc       String   @unique
   type      UserType
   hasChangedDefaultPassword Boolean @default(false) @map("has_changed_default_password")
+  isActive Boolean @default(true) @map("is_active")
   resetPasswordToken String? @map("reset_password_token")
   resetPasswordExpires DateTime? @map("reset_password_expires")
   createdAt DateTime @default(now()) @map("created_at")

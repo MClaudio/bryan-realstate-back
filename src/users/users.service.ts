@@ -49,6 +49,7 @@ export class UsersService {
         address: true,
         ruc: true,
         type: true,
+        isActive: true,
         hasChangedDefaultPassword: true,
         createdAt: true,
         updatedAt: true,
@@ -97,8 +98,10 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException(`User with ID ${id} not found`);
 
-    return this.prisma.user.delete({
+    return this.prisma.user.update({
       where: { id },
+      data: { isActive: false },
+      select: { id: true, isActive: true },
     });
   }
 
@@ -113,6 +116,9 @@ export class UsersService {
     }
 
     if (!isAdmin) {
+      if (!dto.currentPassword) {
+        throw new ConflictException('La contraseña actual es requerida');
+      }
       const match = await bcrypt.compare(dto.currentPassword, user.password);
       if (!match) {
         throw new ConflictException('La contraseña actual es incorrecta');

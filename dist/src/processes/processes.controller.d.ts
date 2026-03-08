@@ -12,9 +12,9 @@ export declare class ProcessesController {
         };
         files: ({
             file: {
-                path: string;
                 id: string;
                 originalName: string;
+                path: string;
                 size: number;
             };
         } & {
@@ -42,9 +42,9 @@ export declare class ProcessesController {
         };
         files: ({
             file: {
-                path: string;
                 id: string;
                 originalName: string;
+                path: string;
                 size: number;
             };
         } & {
@@ -72,9 +72,9 @@ export declare class ProcessesController {
         };
         files: ({
             file: {
-                path: string;
                 id: string;
                 originalName: string;
+                path: string;
                 size: number;
             };
         } & {
@@ -102,9 +102,9 @@ export declare class ProcessesController {
         };
         files: ({
             file: {
-                path: string;
                 id: string;
                 originalName: string;
+                path: string;
                 size: number;
             };
         } & {
