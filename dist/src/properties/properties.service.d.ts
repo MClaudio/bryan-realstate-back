@@ -11,14 +11,20 @@ export declare class PropertiesService {
             lastName: string;
             id: string;
         };
+        negotiationClient: {
+            firstName: string;
+            lastName: string;
+            phone: string;
+            id: string;
+        } | null;
         files: ({
             file: {
+                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
-                path: string;
                 size: number;
                 description: string | null;
             };
@@ -63,6 +69,7 @@ export declare class PropertiesService {
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
+        negotiationClientId: string | null;
         deletedAt: Date | null;
     }>;
     findAll(): Promise<({
@@ -71,14 +78,20 @@ export declare class PropertiesService {
             lastName: string;
             id: string;
         };
+        negotiationClient: {
+            firstName: string;
+            lastName: string;
+            phone: string;
+            id: string;
+        } | null;
         files: ({
             file: {
+                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
-                path: string;
                 size: number;
                 description: string | null;
             };
@@ -123,6 +136,7 @@ export declare class PropertiesService {
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
+        negotiationClientId: string | null;
         deletedAt: Date | null;
     })[]>;
     findFeatured(): Promise<({
@@ -131,14 +145,20 @@ export declare class PropertiesService {
             lastName: string;
             id: string;
         };
+        negotiationClient: {
+            firstName: string;
+            lastName: string;
+            phone: string;
+            id: string;
+        } | null;
         files: ({
             file: {
+                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
-                path: string;
                 size: number;
                 description: string | null;
             };
@@ -183,6 +203,7 @@ export declare class PropertiesService {
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
+        negotiationClientId: string | null;
         deletedAt: Date | null;
     })[]>;
     findOnePublic(id: string): Promise<{
@@ -191,14 +212,20 @@ export declare class PropertiesService {
             lastName: string;
             id: string;
         };
+        negotiationClient: {
+            firstName: string;
+            lastName: string;
+            phone: string;
+            id: string;
+        } | null;
         files: ({
             file: {
+                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
-                path: string;
                 size: number;
                 description: string | null;
             };
@@ -243,6 +270,7 @@ export declare class PropertiesService {
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
+        negotiationClientId: string | null;
         deletedAt: Date | null;
     }>;
     findOne(id: string): Promise<{
@@ -251,14 +279,20 @@ export declare class PropertiesService {
             lastName: string;
             id: string;
         };
+        negotiationClient: {
+            firstName: string;
+            lastName: string;
+            phone: string;
+            id: string;
+        } | null;
         files: ({
             file: {
+                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
-                path: string;
                 size: number;
                 description: string | null;
             };
@@ -303,6 +337,7 @@ export declare class PropertiesService {
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
+        negotiationClientId: string | null;
         deletedAt: Date | null;
     }>;
     update(id: string, updatePropertyDto: UpdatePropertyDto): Promise<{
@@ -311,14 +346,20 @@ export declare class PropertiesService {
             lastName: string;
             id: string;
         };
+        negotiationClient: {
+            firstName: string;
+            lastName: string;
+            phone: string;
+            id: string;
+        } | null;
         files: ({
             file: {
+                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
-                path: string;
                 size: number;
                 description: string | null;
             };
@@ -363,6 +404,7 @@ export declare class PropertiesService {
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
+        negotiationClientId: string | null;
         deletedAt: Date | null;
     }>;
     remove(id: string): Promise<{
@@ -400,6 +442,12 @@ export declare class PropertiesService {
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
+        negotiationClientId: string | null;
         deletedAt: Date | null;
+    }>;
+    resolveMapsUrl(url: string): Promise<{
+        latitude: string;
+        longitude: string;
+        resolvedUrl: string;
     }>;
 }

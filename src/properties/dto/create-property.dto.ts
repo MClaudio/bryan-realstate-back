@@ -164,4 +164,8 @@ export class CreatePropertyDto {
   @IsArray()
   @IsOptional()
   documentFileIds?: string[];
+
+  @IsUUID()
+  @IsOptional()
+  negotiationClientId?: string;
 }

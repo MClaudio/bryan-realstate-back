@@ -19,18 +19,18 @@ export class PropertiesService {
   constructor(private prisma: PrismaService) { }
 
   async create(createPropertyDto: CreatePropertyDto) {
-    const { fileIds, documentFileIds, advisorId, ...propertyData } = createPropertyDto;
+    const { fileIds, documentFileIds, advisorId, negotiationClientId, ...propertyData } = createPropertyDto as CreatePropertyDto & { negotiationClientId?: string };
 
     // Validate file IDs if provided
     if (fileIds && fileIds.length > 0) {
-      const validFileIds = fileIds.filter(id => id && typeof id === 'string' && id.length === 36);
+      const validFileIds = fileIds.filter((id: string) => id && typeof id === 'string' && id.length === 36);
       if (validFileIds.length !== fileIds.length) {
         throw new BadRequestException('Invalid file IDs format');
       }
     }
 
     if (documentFileIds && documentFileIds.length > 0) {
-      const validDocumentFileIds = documentFileIds.filter(id => id && typeof id === 'string' && id.length === 36);
+      const validDocumentFileIds = documentFileIds.filter((id: string) => id && typeof id === 'string' && id.length === 36);
       if (validDocumentFileIds.length !== documentFileIds.length) {
         throw new BadRequestException('Invalid document file IDs format');
       }
@@ -40,6 +40,9 @@ export class PropertiesService {
     const createData: any = { ...propertyData };
     if (advisorId) {
       createData.advisor = { connect: { id: advisorId } };
+    }
+    if (negotiationClientId) {
+      createData.negotiationClient = { connect: { id: negotiationClientId } };
     }
     if (createData.isActive === undefined) {
       createData.isActive = true;
@@ -56,11 +59,11 @@ export class PropertiesService {
         ...omitUndefined(createData),
         files: {
           create: [
-            ...(fileIds ? fileIds.map(fid => ({
+            ...(fileIds ? fileIds.map((fid: string) => ({
               file: { connect: { id: fid } },
               fileType: FileType.image
             })) : []),
-            ...(documentFileIds ? documentFileIds.map(fid => ({
+            ...(documentFileIds ? documentFileIds.map((fid: string) => ({
               file: { connect: { id: fid } },
               fileType: FileType.document
             })) : [])
@@ -73,6 +76,14 @@ export class PropertiesService {
             id: true,
             firstName: true,
             lastName: true,
+          },
+        },
+        negotiationClient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
           },
         },
         files: {
@@ -94,6 +105,14 @@ export class PropertiesService {
             id: true,
             firstName: true,
             lastName: true,
+          },
+        },
+        negotiationClient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
           },
         },
         files: {
@@ -120,6 +139,14 @@ export class PropertiesService {
             lastName: true,
           },
         },
+        negotiationClient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+          },
+        },
         files: {
           include: {
             file: true
@@ -140,6 +167,14 @@ export class PropertiesService {
             id: true,
             firstName: true,
             lastName: true,
+          },
+        },
+        negotiationClient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
           },
         },
         files: {
@@ -166,6 +201,14 @@ export class PropertiesService {
             id: true,
             firstName: true,
             lastName: true,
+          },
+        },
+        negotiationClient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
           },
         },
         files: {
@@ -210,9 +253,16 @@ export class PropertiesService {
     }
 
     // Prepare update data, handling advisor relationship and files
-    const updateData: any = { ...propertyData };
+    const { negotiationClientId, ...restPropertyData } = propertyData as any;
+    const updateData: any = { ...restPropertyData };
     if (advisorId) {
       updateData.advisor = { connect: { id: advisorId } };
+    }
+    // Handle negotiationClient relation
+    if (negotiationClientId !== undefined) {
+      updateData.negotiationClient = negotiationClientId
+        ? { connect: { id: negotiationClientId } }
+        : { disconnect: true };
     }
     if (!propertyModelFields.has('isFeatured')) {
       delete updateData.isFeatured;
@@ -261,6 +311,14 @@ export class PropertiesService {
             lastName: true,
           },
         },
+        negotiationClient: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true,
+          },
+        },
         files: {
           include: {
             file: true
@@ -284,5 +342,39 @@ export class PropertiesService {
     return this.prisma.property.delete({
       where: { id },
     });
+  }
+
+  async resolveMapsUrl(url: string): Promise<{ latitude: string; longitude: string; resolvedUrl: string }> {
+    // Follow all redirects to get the final Google Maps URL
+    const response = await fetch(url, {
+      redirect: 'follow',
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+    });
+    const finalUrl = response.url;
+
+    // Try !3d / !4d pattern (place pin)
+    const placeMatches = [...finalUrl.matchAll(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/g)];
+    if (placeMatches.length > 0) {
+      const last = placeMatches[placeMatches.length - 1];
+      return { latitude: last[1], longitude: last[2], resolvedUrl: finalUrl };
+    }
+
+    // Try @lat,lng pattern (map center / directions)
+    const atMatch = finalUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (atMatch) {
+      return { latitude: atMatch[1], longitude: atMatch[2], resolvedUrl: finalUrl };
+    }
+
+    // Try q= or ll= param
+    const paramPatterns = [
+      /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/,
+      /[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/,
+    ];
+    for (const pattern of paramPatterns) {
+      const match = finalUrl.match(pattern);
+      if (match) return { latitude: match[1], longitude: match[2], resolvedUrl: finalUrl };
+    }
+
+    throw new BadRequestException('No se pudieron extraer coordenadas de la URL proporcionada');
   }
 }

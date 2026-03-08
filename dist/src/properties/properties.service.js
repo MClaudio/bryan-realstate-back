@@ -24,15 +24,15 @@ let PropertiesService = class PropertiesService {
         this.prisma = prisma;
     }
     async create(createPropertyDto) {
-        const { fileIds, documentFileIds, advisorId, ...propertyData } = createPropertyDto;
+        const { fileIds, documentFileIds, advisorId, negotiationClientId, ...propertyData } = createPropertyDto;
         if (fileIds && fileIds.length > 0) {
-            const validFileIds = fileIds.filter(id => id && typeof id === 'string' && id.length === 36);
+            const validFileIds = fileIds.filter((id) => id && typeof id === 'string' && id.length === 36);
             if (validFileIds.length !== fileIds.length) {
                 throw new common_1.BadRequestException('Invalid file IDs format');
             }
         }
         if (documentFileIds && documentFileIds.length > 0) {
-            const validDocumentFileIds = documentFileIds.filter(id => id && typeof id === 'string' && id.length === 36);
+            const validDocumentFileIds = documentFileIds.filter((id) => id && typeof id === 'string' && id.length === 36);
             if (validDocumentFileIds.length !== documentFileIds.length) {
                 throw new common_1.BadRequestException('Invalid document file IDs format');
             }
@@ -40,6 +40,9 @@ let PropertiesService = class PropertiesService {
         const createData = { ...propertyData };
         if (advisorId) {
             createData.advisor = { connect: { id: advisorId } };
+        }
+        if (negotiationClientId) {
+            createData.negotiationClient = { connect: { id: negotiationClientId } };
         }
         if (createData.isActive === undefined) {
             createData.isActive = true;
@@ -55,11 +58,11 @@ let PropertiesService = class PropertiesService {
                 ...omitUndefined(createData),
                 files: {
                     create: [
-                        ...(fileIds ? fileIds.map(fid => ({
+                        ...(fileIds ? fileIds.map((fid) => ({
                             file: { connect: { id: fid } },
                             fileType: client_1.FileType.image
                         })) : []),
-                        ...(documentFileIds ? documentFileIds.map(fid => ({
+                        ...(documentFileIds ? documentFileIds.map((fid) => ({
                             file: { connect: { id: fid } },
                             fileType: client_1.FileType.document
                         })) : [])
@@ -72,6 +75,14 @@ let PropertiesService = class PropertiesService {
                         id: true,
                         firstName: true,
                         lastName: true,
+                    },
+                },
+                negotiationClient: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        phone: true,
                     },
                 },
                 files: {
@@ -91,6 +102,14 @@ let PropertiesService = class PropertiesService {
                         id: true,
                         firstName: true,
                         lastName: true,
+                    },
+                },
+                negotiationClient: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        phone: true,
                     },
                 },
                 files: {
@@ -116,6 +135,14 @@ let PropertiesService = class PropertiesService {
                         lastName: true,
                     },
                 },
+                negotiationClient: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        phone: true,
+                    },
+                },
                 files: {
                     include: {
                         file: true
@@ -135,6 +162,14 @@ let PropertiesService = class PropertiesService {
                         id: true,
                         firstName: true,
                         lastName: true,
+                    },
+                },
+                negotiationClient: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        phone: true,
                     },
                 },
                 files: {
@@ -158,6 +193,14 @@ let PropertiesService = class PropertiesService {
                         id: true,
                         firstName: true,
                         lastName: true,
+                    },
+                },
+                negotiationClient: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        phone: true,
                     },
                 },
                 files: {
@@ -193,9 +236,15 @@ let PropertiesService = class PropertiesService {
                 throw new common_1.BadRequestException('Invalid document file IDs format');
             }
         }
-        const updateData = { ...propertyData };
+        const { negotiationClientId, ...restPropertyData } = propertyData;
+        const updateData = { ...restPropertyData };
         if (advisorId) {
             updateData.advisor = { connect: { id: advisorId } };
+        }
+        if (negotiationClientId !== undefined) {
+            updateData.negotiationClient = negotiationClientId
+                ? { connect: { id: negotiationClientId } }
+                : { disconnect: true };
         }
         if (!propertyModelFields.has('isFeatured')) {
             delete updateData.isFeatured;
@@ -237,6 +286,14 @@ let PropertiesService = class PropertiesService {
                         lastName: true,
                     },
                 },
+                negotiationClient: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true,
+                        phone: true,
+                    },
+                },
                 files: {
                     include: {
                         file: true
@@ -257,6 +314,32 @@ let PropertiesService = class PropertiesService {
         return this.prisma.property.delete({
             where: { id },
         });
+    }
+    async resolveMapsUrl(url) {
+        const response = await fetch(url, {
+            redirect: 'follow',
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+        });
+        const finalUrl = response.url;
+        const placeMatches = [...finalUrl.matchAll(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/g)];
+        if (placeMatches.length > 0) {
+            const last = placeMatches[placeMatches.length - 1];
+            return { latitude: last[1], longitude: last[2], resolvedUrl: finalUrl };
+        }
+        const atMatch = finalUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+        if (atMatch) {
+            return { latitude: atMatch[1], longitude: atMatch[2], resolvedUrl: finalUrl };
+        }
+        const paramPatterns = [
+            /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/,
+            /[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/,
+        ];
+        for (const pattern of paramPatterns) {
+            const match = finalUrl.match(pattern);
+            if (match)
+                return { latitude: match[1], longitude: match[2], resolvedUrl: finalUrl };
+        }
+        throw new common_1.BadRequestException('No se pudieron extraer coordenadas de la URL proporcionada');
     }
 };
 exports.PropertiesService = PropertiesService;

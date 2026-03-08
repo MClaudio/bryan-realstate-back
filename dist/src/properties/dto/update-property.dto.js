@@ -47,6 +47,7 @@ class UpdatePropertyDto {
     youtubeUrl;
     fileIds;
     documentFileIds;
+    negotiationClientId;
 }
 exports.UpdatePropertyDto = UpdatePropertyDto;
 __decorate([
@@ -237,4 +238,10 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Array)
 ], UpdatePropertyDto.prototype, "documentFileIds", void 0);
+__decorate([
+    (0, class_validator_1.IsUUID)(),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.ValidateIf)((obj, value) => value !== null && value !== undefined && value !== ''),
+    __metadata("design:type", Object)
+], UpdatePropertyDto.prototype, "negotiationClientId", void 0);
 //# sourceMappingURL=update-property.dto.js.map

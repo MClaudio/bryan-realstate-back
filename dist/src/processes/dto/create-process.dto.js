@@ -8,7 +8,6 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateProcessDto = exports.ExpenseDto = void 0;
 const class_validator_1 = require("class-validator");
@@ -53,7 +52,7 @@ __decorate([
 ], CreateProcessDto.prototype, "title", void 0);
 __decorate([
     (0, class_validator_1.IsEnum)(client_1.ProcessType),
-    __metadata("design:type", typeof (_a = typeof client_1.ProcessType !== "undefined" && client_1.ProcessType) === "function" ? _a : Object)
+    __metadata("design:type", String)
 ], CreateProcessDto.prototype, "type", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),

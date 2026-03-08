@@ -23,6 +23,11 @@ let PropertiesController = class PropertiesController {
     constructor(propertiesService) {
         this.propertiesService = propertiesService;
     }
+    async resolveMapsUrl(url) {
+        if (!url)
+            throw new common_1.BadRequestException('url query param is required');
+        return this.propertiesService.resolveMapsUrl(url);
+    }
     create(createPropertyDto) {
         return this.propertiesService.create(createPropertyDto);
     }
@@ -49,6 +54,14 @@ let PropertiesController = class PropertiesController {
     }
 };
 exports.PropertiesController = PropertiesController;
+__decorate([
+    (0, common_1.Get)('resolve-maps-url'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    __param(0, (0, common_1.Query)('url')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], PropertiesController.prototype, "resolveMapsUrl", null);
 __decorate([
     (0, common_1.Post)(),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),

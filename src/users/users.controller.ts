@@ -6,6 +6,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('users')
+@UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -29,7 +30,6 @@ export class UsersController {
     return this.usersService.update(id, updateUserDto);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Patch(':id/password')
   updatePassword(@Param('id') id: string, @Body() dto: ChangePasswordDto, @Req() req: any) {
     return this.usersService.changePassword(id, dto, req.user);

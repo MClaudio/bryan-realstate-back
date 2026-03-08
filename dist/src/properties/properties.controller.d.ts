@@ -4,20 +4,31 @@ import { UpdatePropertyDto } from './dto/update-property.dto';
 export declare class PropertiesController {
     private readonly propertiesService;
     constructor(propertiesService: PropertiesService);
+    resolveMapsUrl(url: string): Promise<{
+        latitude: string;
+        longitude: string;
+        resolvedUrl: string;
+    }>;
     create(createPropertyDto: CreatePropertyDto): Promise<{
         advisor: {
             firstName: string;
             lastName: string;
             id: string;
         };
+        negotiationClient: {
+            firstName: string;
+            lastName: string;
+            phone: string;
+            id: string;
+        } | null;
         files: ({
             file: {
+                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
-                path: string;
                 size: number;
                 description: string | null;
             };
@@ -62,6 +73,7 @@ export declare class PropertiesController {
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
+        negotiationClientId: string | null;
         deletedAt: Date | null;
     }>;
     findAll(): Promise<({
@@ -70,14 +82,20 @@ export declare class PropertiesController {
             lastName: string;
             id: string;
         };
+        negotiationClient: {
+            firstName: string;
+            lastName: string;
+            phone: string;
+            id: string;
+        } | null;
         files: ({
             file: {
+                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
-                path: string;
                 size: number;
                 description: string | null;
             };
@@ -122,6 +140,7 @@ export declare class PropertiesController {
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
+        negotiationClientId: string | null;
         deletedAt: Date | null;
     })[]>;
     findAllPublic(): Promise<({
@@ -130,14 +149,20 @@ export declare class PropertiesController {
             lastName: string;
             id: string;
         };
+        negotiationClient: {
+            firstName: string;
+            lastName: string;
+            phone: string;
+            id: string;
+        } | null;
         files: ({
             file: {
+                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
-                path: string;
                 size: number;
                 description: string | null;
             };
@@ -182,6 +207,7 @@ export declare class PropertiesController {
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
+        negotiationClientId: string | null;
         deletedAt: Date | null;
     })[]>;
     findFeatured(): Promise<({
@@ -190,14 +216,20 @@ export declare class PropertiesController {
             lastName: string;
             id: string;
         };
+        negotiationClient: {
+            firstName: string;
+            lastName: string;
+            phone: string;
+            id: string;
+        } | null;
         files: ({
             file: {
+                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
-                path: string;
                 size: number;
                 description: string | null;
             };
@@ -242,6 +274,7 @@ export declare class PropertiesController {
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
+        negotiationClientId: string | null;
         deletedAt: Date | null;
     })[]>;
     findOnePublic(id: string): Promise<{
@@ -250,14 +283,20 @@ export declare class PropertiesController {
             lastName: string;
             id: string;
         };
+        negotiationClient: {
+            firstName: string;
+            lastName: string;
+            phone: string;
+            id: string;
+        } | null;
         files: ({
             file: {
+                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
-                path: string;
                 size: number;
                 description: string | null;
             };
@@ -302,6 +341,7 @@ export declare class PropertiesController {
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
+        negotiationClientId: string | null;
         deletedAt: Date | null;
     }>;
     findOne(id: string): Promise<{
@@ -310,14 +350,20 @@ export declare class PropertiesController {
             lastName: string;
             id: string;
         };
+        negotiationClient: {
+            firstName: string;
+            lastName: string;
+            phone: string;
+            id: string;
+        } | null;
         files: ({
             file: {
+                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
-                path: string;
                 size: number;
                 description: string | null;
             };
@@ -362,6 +408,7 @@ export declare class PropertiesController {
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
+        negotiationClientId: string | null;
         deletedAt: Date | null;
     }>;
     update(id: string, updatePropertyDto: UpdatePropertyDto): Promise<{
@@ -370,14 +417,20 @@ export declare class PropertiesController {
             lastName: string;
             id: string;
         };
+        negotiationClient: {
+            firstName: string;
+            lastName: string;
+            phone: string;
+            id: string;
+        } | null;
         files: ({
             file: {
+                path: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 originalName: string;
                 fileName: string;
-                path: string;
                 size: number;
                 description: string | null;
             };
@@ -422,6 +475,7 @@ export declare class PropertiesController {
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
+        negotiationClientId: string | null;
         deletedAt: Date | null;
     }>;
     remove(id: string): Promise<{
@@ -459,6 +513,7 @@ export declare class PropertiesController {
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
+        negotiationClientId: string | null;
         deletedAt: Date | null;
     }>;
 }

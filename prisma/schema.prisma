@@ -46,6 +46,8 @@ model Client {
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   user      User?     @relation(fields: [userId], references: [id])
+  interests PropertyInterest[]
+  negotiatedProperties Property[]
 
   @@map("clients")
 }
@@ -84,11 +86,14 @@ model Property {
   createdAt         DateTime       @default(now()) @map("created_at")
   updatedAt         DateTime       @updatedAt @map("updated_at")
   deletedAt         DateTime?      @map("deleted_at")
-  isActive          Boolean        @default(true) @map("is_active")
-  isFeatured        Boolean        @default(false) @map("is_featured")
-  advisor           User           @relation(fields: [advisorId], references: [id])
-  files             PropertyFile[]
-  processes         Process[]
+  isActive              Boolean        @default(true) @map("is_active")
+  isFeatured            Boolean        @default(false) @map("is_featured")
+  negotiationClientId   String?        @map("negotiation_client_id") @db.Uuid
+  advisor               User           @relation(fields: [advisorId], references: [id])
+  negotiationClient     Client?        @relation(fields: [negotiationClientId], references: [id])
+  files                 PropertyFile[]
+  processes             Process[]
+  interests             PropertyInterest[]
 
   @@index([code])
   @@map("properties")
@@ -211,4 +216,38 @@ model ProcessFile {
 enum ProcessType {
   Comprador
   Vendedor
+}
+
+model Blacklist {
+  id        String   @id @default(uuid()) @db.Uuid
+  firstName String   @map("first_name")
+  lastName  String   @map("last_name")
+  phone     String
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("blacklist")
+}
+
+enum InterestLevel {
+  Bajo
+  Medio
+  Alto
+  MuyAlto @map("Muy Alto")
+}
+
+model PropertyInterest {
+  id            String        @id @default(uuid()) @db.Uuid
+  propertyId    String        @map("property_id") @db.Uuid
+  clientId      String        @map("client_id") @db.Uuid
+  interestDate  DateTime      @map("interest_date") @db.Date
+  interestLevel InterestLevel @map("interest_level")
+  notes         String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  property      Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("property_interests")
 }

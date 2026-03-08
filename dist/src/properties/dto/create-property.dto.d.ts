@@ -33,4 +33,5 @@ export declare class CreatePropertyDto {
     youtubeUrl?: string;
     fileIds?: string[];
     documentFileIds?: string[];
+    negotiationClientId?: string;
 }

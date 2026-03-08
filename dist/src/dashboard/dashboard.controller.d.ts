@@ -33,12 +33,12 @@ export declare class DashboardController {
             };
             files: ({
                 file: {
+                    path: string;
                     id: string;
                     createdAt: Date;
                     updatedAt: Date;
                     originalName: string;
                     fileName: string;
-                    path: string;
                     size: number;
                     description: string | null;
                 };
@@ -83,6 +83,7 @@ export declare class DashboardController {
             tiktokUrl: string | null;
             instagramUrl: string | null;
             youtubeUrl: string | null;
+            negotiationClientId: string | null;
             deletedAt: Date | null;
         })[];
     }>;
