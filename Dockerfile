@@ -25,4 +25,4 @@ RUN npm run build && echo "=== Build OK ===" && ls -la dist/
 EXPOSE 3000
 
 # Al arrancar: aplica migraciones pendientes y luego inicia la app
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]
