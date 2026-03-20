@@ -365,6 +365,12 @@ export class PropertiesService {
       return { latitude: atMatch[1], longitude: atMatch[2], resolvedUrl: finalUrl };
     }
 
+    // Try /search/lat,lng or /place/lat,lng pattern
+    const searchMatch = finalUrl.match(/\/(?:search|place)\/(-?\d+\.\d+)(?:,|%2C|\+|\s)+(-?\d+\.\d+)/i);
+    if (searchMatch) {
+      return { latitude: searchMatch[1], longitude: searchMatch[2], resolvedUrl: finalUrl };
+    }
+
     // Try q= or ll= param
     const paramPatterns = [
       /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/,
