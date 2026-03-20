@@ -330,6 +330,10 @@ let PropertiesService = class PropertiesService {
         if (atMatch) {
             return { latitude: atMatch[1], longitude: atMatch[2], resolvedUrl: finalUrl };
         }
+        const searchMatch = finalUrl.match(/\/(?:search|place)\/(-?\d+\.\d+)(?:,|%2C|\+|\s)+(-?\d+\.\d+)/i);
+        if (searchMatch) {
+            return { latitude: searchMatch[1], longitude: searchMatch[2], resolvedUrl: finalUrl };
+        }
         const paramPatterns = [
             /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/,
             /[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/,
