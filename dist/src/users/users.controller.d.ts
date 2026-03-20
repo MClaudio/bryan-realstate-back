@@ -15,10 +15,7 @@ export declare class UsersController {
         address: string | null;
         ruc: string;
         type: import("@prisma/client").$Enums.UserType;
-<<<<<<< HEAD
-=======
         isActive: boolean;
->>>>>>> f8b34bb (change user model)
         id: string;
         hasChangedDefaultPassword: boolean;
         resetPasswordToken: string | null;
@@ -35,10 +32,7 @@ export declare class UsersController {
         address: string | null;
         ruc: string;
         type: import("@prisma/client").$Enums.UserType;
-<<<<<<< HEAD
-=======
         isActive: boolean;
->>>>>>> f8b34bb (change user model)
         id: string;
         hasChangedDefaultPassword: boolean;
         createdAt: Date;
@@ -53,10 +47,7 @@ export declare class UsersController {
         address: string | null;
         ruc: string;
         type: import("@prisma/client").$Enums.UserType;
-<<<<<<< HEAD
-=======
         isActive: boolean;
->>>>>>> f8b34bb (change user model)
         id: string;
         hasChangedDefaultPassword: boolean;
         resetPasswordToken: string | null;
@@ -74,10 +65,7 @@ export declare class UsersController {
         address: string | null;
         ruc: string;
         type: import("@prisma/client").$Enums.UserType;
-<<<<<<< HEAD
-=======
         isActive: boolean;
->>>>>>> f8b34bb (change user model)
         id: string;
         hasChangedDefaultPassword: boolean;
         resetPasswordToken: string | null;
@@ -92,25 +80,7 @@ export declare class UsersController {
         updatedAt: Date;
     }>;
     remove(id: string): Promise<{
-<<<<<<< HEAD
-        firstName: string;
-        lastName: string;
-        username: string;
-        email: string;
-        password: string;
-        phone: string | null;
-        address: string | null;
-        ruc: string;
-        type: import("@prisma/client").$Enums.UserType;
-        id: string;
-        hasChangedDefaultPassword: boolean;
-        resetPasswordToken: string | null;
-        resetPasswordExpires: Date | null;
-        createdAt: Date;
-        updatedAt: Date;
-=======
         isActive: boolean;
         id: string;
->>>>>>> f8b34bb (change user model)
     }>;
 }

@@ -46,4 +46,12 @@ export class CreateClientDto {
   @IsBoolean()
   @IsOptional()
   lastLogin?: boolean;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
+
+  @IsString()
+  @IsOptional()
+  interestDescription?: string;
 }

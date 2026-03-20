@@ -23,6 +23,8 @@ class CreateClientDto {
     birthDate;
     userId;
     lastLogin;
+    notes;
+    interestDescription;
 }
 exports.CreateClientDto = CreateClientDto;
 __decorate([
@@ -80,4 +82,14 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Boolean)
 ], CreateClientDto.prototype, "lastLogin", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateClientDto.prototype, "notes", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", String)
+], CreateClientDto.prototype, "interestDescription", void 0);
 //# sourceMappingURL=create-client.dto.js.map
