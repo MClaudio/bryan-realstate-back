@@ -1,7 +1,5 @@
 generator client {
-  provider   = "prisma-client-js"
-
-  engineType = "library"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -44,6 +42,8 @@ model Client {
   birthDate DateTime? @map("birth_date") @db.Date
   userId    String?   @map("user_id") @db.Uuid
   lastLogin Boolean   @default(false) @map("last_login")
+  notes                String?   @map("notes")
+  interestDescription  String?   @map("interest_description")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   user      User?     @relation(fields: [userId], references: [id])

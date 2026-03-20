@@ -80,17 +80,9 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException(`User with ID ${id} not found`);
 
-    const data: any = { ...updateUserDto };
-
-    if (updateUserDto.password) {
-      const salt = await bcrypt.genSalt();
-      data.password = await bcrypt.hash(updateUserDto.password, salt);
-      data.hasChangedDefaultPassword = true;
-    }
-
     return this.prisma.user.update({
       where: { id },
-      data,
+      data: { ...updateUserDto },
     });
   }
 

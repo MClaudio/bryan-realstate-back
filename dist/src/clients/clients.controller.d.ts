@@ -18,6 +18,8 @@ export declare class ClientsController {
         birthDate: Date | null;
         userId: string | null;
         lastLogin: boolean;
+        notes: string | null;
+        interestDescription: string | null;
     }>;
     findAll(): Promise<({
         user: {
@@ -39,6 +41,8 @@ export declare class ClientsController {
         birthDate: Date | null;
         userId: string | null;
         lastLogin: boolean;
+        notes: string | null;
+        interestDescription: string | null;
     })[]>;
     findOne(id: string): Promise<{
         user: {
@@ -60,6 +64,8 @@ export declare class ClientsController {
         birthDate: Date | null;
         userId: string | null;
         lastLogin: boolean;
+        notes: string | null;
+        interestDescription: string | null;
     }>;
     update(id: string, updateClientDto: UpdateClientDto): Promise<{
         firstName: string;
@@ -75,6 +81,8 @@ export declare class ClientsController {
         birthDate: Date | null;
         userId: string | null;
         lastLogin: boolean;
+        notes: string | null;
+        interestDescription: string | null;
     }>;
     remove(id: string): Promise<{
         firstName: string;
@@ -90,5 +98,7 @@ export declare class ClientsController {
         birthDate: Date | null;
         userId: string | null;
         lastLogin: boolean;
+        notes: string | null;
+        interestDescription: string | null;
     }>;
 }

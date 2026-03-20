@@ -9,4 +9,6 @@ export declare class CreateClientDto {
     birthDate?: Date;
     userId?: string;
     lastLogin?: boolean;
+    notes?: string;
+    interestDescription?: string;
 }

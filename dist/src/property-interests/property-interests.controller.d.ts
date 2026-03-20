@@ -21,11 +21,11 @@ export declare class PropertyInterestsController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        notes: string | null;
         propertyId: string;
         clientId: string;
         interestDate: Date;
         interestLevel: import("@prisma/client").$Enums.InterestLevel;
-        notes: string | null;
     }>;
     findAll(propertyId?: string, clientId?: string): never[] | Promise<({
         client: {
@@ -44,11 +44,11 @@ export declare class PropertyInterestsController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        notes: string | null;
         propertyId: string;
         clientId: string;
         interestDate: Date;
         interestLevel: import("@prisma/client").$Enums.InterestLevel;
-        notes: string | null;
     })[]>;
     findOne(id: string): Promise<{
         client: {
@@ -67,11 +67,11 @@ export declare class PropertyInterestsController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        notes: string | null;
         propertyId: string;
         clientId: string;
         interestDate: Date;
         interestLevel: import("@prisma/client").$Enums.InterestLevel;
-        notes: string | null;
     }>;
     update(id: string, dto: UpdatePropertyInterestDto): Promise<{
         client: {
@@ -90,20 +90,20 @@ export declare class PropertyInterestsController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        notes: string | null;
         propertyId: string;
         clientId: string;
         interestDate: Date;
         interestLevel: import("@prisma/client").$Enums.InterestLevel;
-        notes: string | null;
     }>;
     remove(id: string): Promise<{
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        notes: string | null;
         propertyId: string;
         clientId: string;
         interestDate: Date;
         interestLevel: import("@prisma/client").$Enums.InterestLevel;
-        notes: string | null;
     }>;
 }
