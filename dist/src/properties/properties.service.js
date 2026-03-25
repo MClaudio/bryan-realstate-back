@@ -316,7 +316,8 @@ let PropertiesService = class PropertiesService {
         });
     }
     async resolveMapsUrl(url) {
-        const response = await fetch(url, {
+        const fetchFn = global.fetch || require('node-fetch');
+        const response = await fetchFn(url, {
             redirect: 'follow',
             headers: { 'User-Agent': 'Mozilla/5.0' },
         });
@@ -342,6 +343,19 @@ let PropertiesService = class PropertiesService {
             const match = finalUrl.match(pattern);
             if (match)
                 return { latitude: match[1], longitude: match[2], resolvedUrl: finalUrl };
+        }
+        try {
+            const text = await response.text();
+            let coordsMatch = text.match(/center=(-?\d+\.\d+)%2C(-?\d+\.\d+)/);
+            if (!coordsMatch) {
+                coordsMatch = text.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
+            }
+            if (coordsMatch) {
+                return { latitude: coordsMatch[1], longitude: coordsMatch[2], resolvedUrl: finalUrl };
+            }
+        }
+        catch (e) {
+            console.error("Error fetching map URL content:", e);
         }
         throw new common_1.BadRequestException('No se pudieron extraer coordenadas de la URL proporcionada');
     }
