@@ -46,6 +46,7 @@ exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
 const users_service_1 = require("../users/users.service");
 const jwt_1 = require("@nestjs/jwt");
+const config_1 = require("@nestjs/config");
 const bcrypt = __importStar(require("bcrypt"));
 const email_service_1 = require("../email/email.service");
 const prisma_service_1 = require("../prisma/prisma.service");
@@ -53,13 +54,36 @@ const crypto = __importStar(require("crypto"));
 let AuthService = class AuthService {
     usersService;
     jwtService;
+    configService;
     emailService;
     prisma;
-    constructor(usersService, jwtService, emailService, prisma) {
+    constructor(usersService, jwtService, configService, emailService, prisma) {
         this.usersService = usersService;
         this.jwtService = jwtService;
+        this.configService = configService;
         this.emailService = emailService;
         this.prisma = prisma;
+    }
+    signAccessToken(payload) {
+        return this.jwtService.sign(payload);
+    }
+    signRefreshToken(payload) {
+        const refreshSecret = this.configService.get('JWT_REFRESH_SECRET') ||
+            this.configService.get('JWT_SECRET') ||
+            'defaultSecret';
+        const expiresIn = (this.configService.get('JWT_REFRESH_EXPIRATION') || '7d');
+        return this.jwtService.sign(payload, { secret: refreshSecret, expiresIn });
+    }
+    verifyRefreshToken(refreshToken) {
+        const refreshSecret = this.configService.get('JWT_REFRESH_SECRET') ||
+            this.configService.get('JWT_SECRET') ||
+            'defaultSecret';
+        try {
+            return this.jwtService.verify(refreshToken, { secret: refreshSecret });
+        }
+        catch {
+            throw new common_1.UnauthorizedException('Refresh token inválido o expirado');
+        }
     }
     async validateUser(username, pass) {
         const user = await this.usersService.findByUsername(username);
@@ -83,9 +107,26 @@ let AuthService = class AuthService {
             type: user.type
         };
         return {
-            access_token: this.jwtService.sign(payload),
+            access_token: this.signAccessToken(payload),
+            refresh_token: this.signRefreshToken(payload),
             user,
             first_login: !user.hasChangedDefaultPassword
+        };
+    }
+    async refresh(refreshToken) {
+        const payload = this.verifyRefreshToken(refreshToken);
+        const user = await this.usersService.findOne(payload.sub);
+        if (user?.isActive === false) {
+            throw new common_1.UnauthorizedException('Tu cuenta está desactivada. Contacta al administrador.');
+        }
+        const newPayload = {
+            username: payload.username,
+            sub: payload.sub,
+            type: payload.type,
+        };
+        return {
+            access_token: this.signAccessToken(newPayload),
+            refresh_token: this.signRefreshToken(newPayload),
         };
     }
     async forgotPassword(forgotPasswordDto) {
@@ -154,6 +195,7 @@ exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [users_service_1.UsersService,
         jwt_1.JwtService,
+        config_1.ConfigService,
         email_service_1.EmailService,
         prisma_service_1.PrismaService])
 ], AuthService);

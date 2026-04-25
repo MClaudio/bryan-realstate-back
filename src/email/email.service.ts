@@ -19,18 +19,43 @@ export class EmailService {
     this.fromEmail = this.configService.get<string>('MAIL_FROM') || user || 'noreply@bryanrealstate.com';
     this.fromName = this.configService.get<string>('MAIL_FROM_NAME') || 'Bryan RealState';
 
+    const parseBoolean = (value: string | undefined) => {
+      if (!value) return undefined;
+      const normalized = value.trim().toLowerCase();
+      if (['true', '1', 'yes', 'y', 'on'].includes(normalized)) return true;
+      if (['false', '0', 'no', 'n', 'off'].includes(normalized)) return false;
+      return undefined;
+    };
+
     // Si no hay configuración SMTP, usar ethereal para desarrollo
     if (!host || !port || !user || !pass) {
       this.logger.warn('No SMTP configuration found. Emails will be logged to console.');
       this.transporter = null as any;
     } else {
+      const configuredSecure = parseBoolean(this.configService.get<string>('MAIL_SECURE'));
+      const configuredRequireTls = parseBoolean(this.configService.get<string>('MAIL_REQUIRE_TLS'));
+      const configuredIgnoreTls = parseBoolean(this.configService.get<string>('MAIL_IGNORE_TLS'));
+      const configuredRejectUnauthorized = parseBoolean(
+        this.configService.get<string>('MAIL_TLS_REJECT_UNAUTHORIZED'),
+      );
+
+      const secure = configuredSecure ?? port === 465;
+      const requireTLS = configuredRequireTls ?? false;
+      const ignoreTLS = configuredIgnoreTls ?? false;
+      const rejectUnauthorized = configuredRejectUnauthorized ?? true;
+
       this.transporter = nodemailer.createTransport({
         host,
         port,
-        secure: port === 465,
+        secure,
+        requireTLS,
+        ignoreTLS,
         auth: {
           user,
           pass,
+        },
+        tls: {
+          rejectUnauthorized,
         },
       });
 
@@ -45,7 +70,9 @@ export class EmailService {
   }
 
   async sendResetPasswordEmail(to: string, resetToken: string, userName: string): Promise<void> {
-    const resetUrl = `${this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
+    const baseUrl = frontendUrl.replace(/\/$/, '');
+    const resetUrl = `${baseUrl}/admin/reset-password?token=${resetToken}`;
     
     const subject = 'Recuperación de Contraseña - Bryan RealState';
     const html = this.getResetPasswordTemplate(userName, resetUrl);
