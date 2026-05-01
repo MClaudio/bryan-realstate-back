@@ -22,8 +22,8 @@ export declare class PropertyInterestsController {
         createdAt: Date;
         updatedAt: Date;
         notes: string | null;
-        propertyId: string;
         clientId: string;
+        propertyId: string;
         interestDate: Date;
         interestLevel: import("@prisma/client").$Enums.InterestLevel;
     }>;
@@ -45,8 +45,8 @@ export declare class PropertyInterestsController {
         createdAt: Date;
         updatedAt: Date;
         notes: string | null;
-        propertyId: string;
         clientId: string;
+        propertyId: string;
         interestDate: Date;
         interestLevel: import("@prisma/client").$Enums.InterestLevel;
     })[]>;
@@ -68,8 +68,8 @@ export declare class PropertyInterestsController {
         createdAt: Date;
         updatedAt: Date;
         notes: string | null;
-        propertyId: string;
         clientId: string;
+        propertyId: string;
         interestDate: Date;
         interestLevel: import("@prisma/client").$Enums.InterestLevel;
     }>;
@@ -91,8 +91,8 @@ export declare class PropertyInterestsController {
         createdAt: Date;
         updatedAt: Date;
         notes: string | null;
-        propertyId: string;
         clientId: string;
+        propertyId: string;
         interestDate: Date;
         interestLevel: import("@prisma/client").$Enums.InterestLevel;
     }>;
@@ -101,8 +101,8 @@ export declare class PropertyInterestsController {
         createdAt: Date;
         updatedAt: Date;
         notes: string | null;
-        propertyId: string;
         clientId: string;
+        propertyId: string;
         interestDate: Date;
         interestLevel: import("@prisma/client").$Enums.InterestLevel;
     }>;

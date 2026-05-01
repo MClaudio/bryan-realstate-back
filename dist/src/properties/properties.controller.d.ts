@@ -44,6 +44,7 @@ export declare class PropertiesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        status: import("@prisma/client").$Enums.PropertyStatus;
         code: string;
         locationUrl: string;
         constructionArea: import("@prisma/client-runtime-utils").Decimal;
@@ -59,7 +60,6 @@ export declare class PropertiesController {
         zone: import("@prisma/client").$Enums.Zone;
         cityTime: number | null;
         observations: string | null;
-        status: import("@prisma/client").$Enums.PropertyStatus;
         advisorId: string;
         owner: string | null;
         price: import("@prisma/client-runtime-utils").Decimal;
@@ -111,6 +111,7 @@ export declare class PropertiesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        status: import("@prisma/client").$Enums.PropertyStatus;
         code: string;
         locationUrl: string;
         constructionArea: import("@prisma/client-runtime-utils").Decimal;
@@ -126,7 +127,6 @@ export declare class PropertiesController {
         zone: import("@prisma/client").$Enums.Zone;
         cityTime: number | null;
         observations: string | null;
-        status: import("@prisma/client").$Enums.PropertyStatus;
         advisorId: string;
         owner: string | null;
         price: import("@prisma/client-runtime-utils").Decimal;
@@ -178,6 +178,7 @@ export declare class PropertiesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        status: import("@prisma/client").$Enums.PropertyStatus;
         code: string;
         locationUrl: string;
         constructionArea: import("@prisma/client-runtime-utils").Decimal;
@@ -193,7 +194,6 @@ export declare class PropertiesController {
         zone: import("@prisma/client").$Enums.Zone;
         cityTime: number | null;
         observations: string | null;
-        status: import("@prisma/client").$Enums.PropertyStatus;
         advisorId: string;
         owner: string | null;
         price: import("@prisma/client-runtime-utils").Decimal;
@@ -245,6 +245,7 @@ export declare class PropertiesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        status: import("@prisma/client").$Enums.PropertyStatus;
         code: string;
         locationUrl: string;
         constructionArea: import("@prisma/client-runtime-utils").Decimal;
@@ -260,7 +261,6 @@ export declare class PropertiesController {
         zone: import("@prisma/client").$Enums.Zone;
         cityTime: number | null;
         observations: string | null;
-        status: import("@prisma/client").$Enums.PropertyStatus;
         advisorId: string;
         owner: string | null;
         price: import("@prisma/client-runtime-utils").Decimal;
@@ -312,6 +312,7 @@ export declare class PropertiesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        status: import("@prisma/client").$Enums.PropertyStatus;
         code: string;
         locationUrl: string;
         constructionArea: import("@prisma/client-runtime-utils").Decimal;
@@ -327,7 +328,6 @@ export declare class PropertiesController {
         zone: import("@prisma/client").$Enums.Zone;
         cityTime: number | null;
         observations: string | null;
-        status: import("@prisma/client").$Enums.PropertyStatus;
         advisorId: string;
         owner: string | null;
         price: import("@prisma/client-runtime-utils").Decimal;
@@ -379,6 +379,7 @@ export declare class PropertiesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        status: import("@prisma/client").$Enums.PropertyStatus;
         code: string;
         locationUrl: string;
         constructionArea: import("@prisma/client-runtime-utils").Decimal;
@@ -394,7 +395,6 @@ export declare class PropertiesController {
         zone: import("@prisma/client").$Enums.Zone;
         cityTime: number | null;
         observations: string | null;
-        status: import("@prisma/client").$Enums.PropertyStatus;
         advisorId: string;
         owner: string | null;
         price: import("@prisma/client-runtime-utils").Decimal;
@@ -446,6 +446,7 @@ export declare class PropertiesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        status: import("@prisma/client").$Enums.PropertyStatus;
         code: string;
         locationUrl: string;
         constructionArea: import("@prisma/client-runtime-utils").Decimal;
@@ -461,7 +462,6 @@ export declare class PropertiesController {
         zone: import("@prisma/client").$Enums.Zone;
         cityTime: number | null;
         observations: string | null;
-        status: import("@prisma/client").$Enums.PropertyStatus;
         advisorId: string;
         owner: string | null;
         price: import("@prisma/client-runtime-utils").Decimal;
@@ -484,6 +484,7 @@ export declare class PropertiesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        status: import("@prisma/client").$Enums.PropertyStatus;
         code: string;
         locationUrl: string;
         constructionArea: import("@prisma/client-runtime-utils").Decimal;
@@ -499,7 +500,6 @@ export declare class PropertiesController {
         zone: import("@prisma/client").$Enums.Zone;
         cityTime: number | null;
         observations: string | null;
-        status: import("@prisma/client").$Enums.PropertyStatus;
         advisorId: string;
         owner: string | null;
         price: import("@prisma/client-runtime-utils").Decimal;

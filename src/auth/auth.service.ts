@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -14,9 +15,42 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    private configService: ConfigService,
     private emailService: EmailService,
     private prisma: PrismaService,
   ) {}
+
+  private signAccessToken(payload: { username: string; sub: string; type: string }) {
+    return this.jwtService.sign(payload);
+  }
+
+  private signRefreshToken(payload: { username: string; sub: string; type: string }) {
+    const refreshSecret =
+      this.configService.get<string>('JWT_REFRESH_SECRET') ||
+      this.configService.get<string>('JWT_SECRET') ||
+      'defaultSecret';
+
+    const expiresIn = (this.configService.get<string>('JWT_REFRESH_EXPIRATION') || '7d') as any;
+
+    return this.jwtService.sign(payload, { secret: refreshSecret, expiresIn });
+  }
+
+  private verifyRefreshToken(refreshToken: string) {
+    const refreshSecret =
+      this.configService.get<string>('JWT_REFRESH_SECRET') ||
+      this.configService.get<string>('JWT_SECRET') ||
+      'defaultSecret';
+
+    try {
+      return this.jwtService.verify(refreshToken, { secret: refreshSecret }) as {
+        username: string;
+        sub: string;
+        type: string;
+      };
+    } catch {
+      throw new UnauthorizedException('Refresh token inválido o expirado');
+    }
+  }
 
   async validateUser(username: string, pass: string): Promise<any> {
     const user = await this.usersService.findByUsername(username);
@@ -45,9 +79,30 @@ export class AuthService {
     };
 
     return {
-      access_token: this.jwtService.sign(payload),
+      access_token: this.signAccessToken(payload),
+      refresh_token: this.signRefreshToken(payload),
       user,
       first_login: !user.hasChangedDefaultPassword
+    };
+  }
+
+  async refresh(refreshToken: string) {
+    const payload = this.verifyRefreshToken(refreshToken);
+
+    const user = await this.usersService.findOne(payload.sub);
+    if ((user as any)?.isActive === false) {
+      throw new UnauthorizedException('Tu cuenta está desactivada. Contacta al administrador.');
+    }
+
+    const newPayload = {
+      username: payload.username,
+      sub: payload.sub,
+      type: payload.type,
+    };
+
+    return {
+      access_token: this.signAccessToken(newPayload),
+      refresh_token: this.signRefreshToken(newPayload),
     };
   }
 

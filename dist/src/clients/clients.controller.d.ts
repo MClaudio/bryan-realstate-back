@@ -20,6 +20,8 @@ export declare class ClientsController {
         lastLogin: boolean;
         notes: string | null;
         interestDescription: string | null;
+        googleContactId: string | null;
+        googleSyncedAt: Date | null;
     }>;
     findAll(): Promise<({
         user: {
@@ -43,6 +45,8 @@ export declare class ClientsController {
         lastLogin: boolean;
         notes: string | null;
         interestDescription: string | null;
+        googleContactId: string | null;
+        googleSyncedAt: Date | null;
     })[]>;
     findOne(id: string): Promise<{
         user: {
@@ -66,6 +70,8 @@ export declare class ClientsController {
         lastLogin: boolean;
         notes: string | null;
         interestDescription: string | null;
+        googleContactId: string | null;
+        googleSyncedAt: Date | null;
     }>;
     update(id: string, updateClientDto: UpdateClientDto): Promise<{
         firstName: string;
@@ -83,6 +89,8 @@ export declare class ClientsController {
         lastLogin: boolean;
         notes: string | null;
         interestDescription: string | null;
+        googleContactId: string | null;
+        googleSyncedAt: Date | null;
     }>;
     remove(id: string): Promise<{
         firstName: string;
@@ -100,5 +108,7 @@ export declare class ClientsController {
         lastLogin: boolean;
         notes: string | null;
         interestDescription: string | null;
+        googleContactId: string | null;
+        googleSyncedAt: Date | null;
     }>;
 }

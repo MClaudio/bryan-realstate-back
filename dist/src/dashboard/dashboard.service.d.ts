@@ -54,6 +54,7 @@ export declare class DashboardService {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            status: import("@prisma/client").$Enums.PropertyStatus;
             code: string;
             locationUrl: string;
             constructionArea: import("@prisma/client-runtime-utils").Decimal;
@@ -69,7 +70,6 @@ export declare class DashboardService {
             zone: import("@prisma/client").$Enums.Zone;
             cityTime: number | null;
             observations: string | null;
-            status: import("@prisma/client").$Enums.PropertyStatus;
             advisorId: string;
             owner: string | null;
             price: import("@prisma/client-runtime-utils").Decimal;
@@ -148,8 +148,8 @@ export declare class DashboardService {
             address: string;
             id: string;
             createdAt: Date;
-            code: string;
             status: import("@prisma/client").$Enums.PropertyStatus;
+            code: string;
             price: import("@prisma/client-runtime-utils").Decimal;
             salePrice: import("@prisma/client-runtime-utils").Decimal | null;
         }[];

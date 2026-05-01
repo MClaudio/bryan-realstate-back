@@ -22,8 +22,8 @@ export declare class PropertyInterestsService {
         createdAt: Date;
         updatedAt: Date;
         notes: string | null;
-        propertyId: string;
         clientId: string;
+        propertyId: string;
         interestDate: Date;
         interestLevel: import("@prisma/client").$Enums.InterestLevel;
     }>;
@@ -45,8 +45,8 @@ export declare class PropertyInterestsService {
         createdAt: Date;
         updatedAt: Date;
         notes: string | null;
-        propertyId: string;
         clientId: string;
+        propertyId: string;
         interestDate: Date;
         interestLevel: import("@prisma/client").$Enums.InterestLevel;
     })[]>;
@@ -68,8 +68,8 @@ export declare class PropertyInterestsService {
         createdAt: Date;
         updatedAt: Date;
         notes: string | null;
-        propertyId: string;
         clientId: string;
+        propertyId: string;
         interestDate: Date;
         interestLevel: import("@prisma/client").$Enums.InterestLevel;
     })[]>;
@@ -91,8 +91,8 @@ export declare class PropertyInterestsService {
         createdAt: Date;
         updatedAt: Date;
         notes: string | null;
-        propertyId: string;
         clientId: string;
+        propertyId: string;
         interestDate: Date;
         interestLevel: import("@prisma/client").$Enums.InterestLevel;
     }>;
@@ -114,8 +114,8 @@ export declare class PropertyInterestsService {
         createdAt: Date;
         updatedAt: Date;
         notes: string | null;
-        propertyId: string;
         clientId: string;
+        propertyId: string;
         interestDate: Date;
         interestLevel: import("@prisma/client").$Enums.InterestLevel;
     }>;
@@ -124,8 +124,8 @@ export declare class PropertyInterestsService {
         createdAt: Date;
         updatedAt: Date;
         notes: string | null;
-        propertyId: string;
         clientId: string;
+        propertyId: string;
         interestDate: Date;
         interestLevel: import("@prisma/client").$Enums.InterestLevel;
     }>;

@@ -61,18 +61,41 @@ let EmailService = EmailService_1 = class EmailService {
         const pass = this.configService.get('MAIL_PASSWORD');
         this.fromEmail = this.configService.get('MAIL_FROM') || user || 'noreply@bryanrealstate.com';
         this.fromName = this.configService.get('MAIL_FROM_NAME') || 'Bryan RealState';
+        const parseBoolean = (value) => {
+            if (!value)
+                return undefined;
+            const normalized = value.trim().toLowerCase();
+            if (['true', '1', 'yes', 'y', 'on'].includes(normalized))
+                return true;
+            if (['false', '0', 'no', 'n', 'off'].includes(normalized))
+                return false;
+            return undefined;
+        };
         if (!host || !port || !user || !pass) {
             this.logger.warn('No SMTP configuration found. Emails will be logged to console.');
             this.transporter = null;
         }
         else {
+            const configuredSecure = parseBoolean(this.configService.get('MAIL_SECURE'));
+            const configuredRequireTls = parseBoolean(this.configService.get('MAIL_REQUIRE_TLS'));
+            const configuredIgnoreTls = parseBoolean(this.configService.get('MAIL_IGNORE_TLS'));
+            const configuredRejectUnauthorized = parseBoolean(this.configService.get('MAIL_TLS_REJECT_UNAUTHORIZED'));
+            const secure = configuredSecure ?? port === 465;
+            const requireTLS = configuredRequireTls ?? false;
+            const ignoreTLS = configuredIgnoreTls ?? false;
+            const rejectUnauthorized = configuredRejectUnauthorized ?? true;
             this.transporter = nodemailer.createTransport({
                 host,
                 port,
-                secure: port === 465,
+                secure,
+                requireTLS,
+                ignoreTLS,
                 auth: {
                     user,
                     pass,
+                },
+                tls: {
+                    rejectUnauthorized,
                 },
             });
             this.transporter.verify((error) => {
@@ -86,7 +109,9 @@ let EmailService = EmailService_1 = class EmailService {
         }
     }
     async sendResetPasswordEmail(to, resetToken, userName) {
-        const resetUrl = `${this.configService.get('FRONTEND_URL') || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+        const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:5173';
+        const baseUrl = frontendUrl.replace(/\/$/, '');
+        const resetUrl = `${baseUrl}/admin/reset-password?token=${resetToken}`;
         const subject = 'Recuperación de Contraseña - Bryan RealState';
         const html = this.getResetPasswordTemplate(userName, resetUrl);
         await this.sendEmail(to, subject, html);

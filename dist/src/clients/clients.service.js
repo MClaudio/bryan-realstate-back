@@ -46,10 +46,13 @@ exports.ClientsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const bcrypt = __importStar(require("bcrypt"));
+const sync_contacts_service_1 = require("../sync-contacts/sync-contacts.service");
 let ClientsService = class ClientsService {
     prisma;
-    constructor(prisma) {
+    syncContactsService;
+    constructor(prisma, syncContactsService) {
         this.prisma = prisma;
+        this.syncContactsService = syncContactsService;
     }
     async create(createClientDto) {
         if (createClientDto.email) {
@@ -66,12 +69,14 @@ let ClientsService = class ClientsService {
             const salt = await bcrypt.genSalt();
             passwordHash = await bcrypt.hash(password, salt);
         }
-        return this.prisma.client.create({
+        const createdClient = await this.prisma.client.create({
             data: {
                 ...clientData,
                 password: passwordHash,
             },
         });
+        await this.syncContactsService.syncClientToGoogle(createdClient);
+        return createdClient;
     }
     async findAll() {
         return this.prisma.client.findMany({
@@ -115,10 +120,25 @@ let ClientsService = class ClientsService {
             const salt = await bcrypt.genSalt();
             data.password = await bcrypt.hash(password, salt);
         }
-        return this.prisma.client.update({
+        const updatedClient = await this.prisma.client.update({
             where: { id },
             data,
         });
+        if (updatedClient.googleContactId) {
+            await this.syncContactsService.updateClientInGoogle({
+                id: updatedClient.id,
+                firstName: updatedClient.firstName,
+                lastName: updatedClient.lastName,
+                email: updatedClient.email,
+                phone: updatedClient.phone,
+                googleContactId: updatedClient.googleContactId,
+                interestDescription: updatedClient.interestDescription,
+            });
+        }
+        else {
+            await this.syncContactsService.syncClientToGoogle(updatedClient);
+        }
+        return updatedClient;
     }
     async remove(id) {
         const client = await this.prisma.client.findUnique({ where: { id } });
@@ -132,6 +152,7 @@ let ClientsService = class ClientsService {
 exports.ClientsService = ClientsService;
 exports.ClientsService = ClientsService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        sync_contacts_service_1.SyncContactsService])
 ], ClientsService);
 //# sourceMappingURL=clients.service.js.map
