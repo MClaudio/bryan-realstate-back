@@ -40,6 +40,8 @@ model Client {
   address   String?
   ruc       String?
   birthDate DateTime? @map("birth_date") @db.Date
+  googleContactId String?   @unique @map("google_contact_id")
+  googleSyncedAt  DateTime? @map("google_synced_at")
   userId    String?   @map("user_id") @db.Uuid
   lastLogin Boolean   @default(false) @map("last_login")
   notes                String?   @map("notes")
@@ -251,4 +253,46 @@ model PropertyInterest {
   client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@map("property_interests")
+}
+
+model GoogleAuthToken {
+  id           String   @id @default(uuid()) @db.Uuid
+  provider     String   @unique @default("google")
+  accessToken  String   @map("access_token")
+  refreshToken String?  @map("refresh_token")
+  tokenType    String?  @map("token_type")
+  scope        String?
+  expiryDate   DateTime? @map("expiry_date")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("google_auth_tokens")
+}
+
+model ContactSyncExclusion {
+  id              String   @id @default(uuid()) @db.Uuid
+  candidateId     String?  @unique @map("candidate_id")
+  googleContactId String?  @unique @map("google_contact_id")
+  email           String?
+  phone           String?
+  reason          String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([email])
+  @@index([phone])
+  @@map("contact_sync_exclusions")
+}
+
+model ContactSyncLog {
+  id                String   @id @default(uuid()) @db.Uuid
+  direction         String
+  importedCount     Int      @default(0) @map("imported_count")
+  duplicateCount    Int      @default(0) @map("duplicate_count")
+  excludedCount     Int      @default(0) @map("excluded_count")
+  invalidCount      Int      @default(0) @map("invalid_count")
+  details           Json?    @map("details")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@map("contact_sync_logs")
 }

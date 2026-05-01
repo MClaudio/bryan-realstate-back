@@ -3,10 +3,14 @@ import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
+import { SyncContactsService } from '../sync-contacts/sync-contacts.service';
 
 @Injectable()
 export class ClientsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private syncContactsService: SyncContactsService,
+  ) {}
 
   async create(createClientDto: CreateClientDto) {
     if (createClientDto.email) {
@@ -26,12 +30,16 @@ export class ClientsService {
       passwordHash = await bcrypt.hash(password, salt);
     }
 
-    return this.prisma.client.create({
+    const createdClient = await this.prisma.client.create({
       data: {
         ...clientData,
         password: passwordHash,
       },
     });
+
+    await this.syncContactsService.syncClientToGoogle(createdClient);
+
+    return createdClient;
   }
 
   async findAll() {
@@ -82,10 +90,26 @@ export class ClientsService {
       data.password = await bcrypt.hash(password, salt);
     }
 
-    return this.prisma.client.update({
+    const updatedClient = await this.prisma.client.update({
       where: { id },
       data,
     });
+
+    if (updatedClient.googleContactId) {
+      await this.syncContactsService.updateClientInGoogle({
+        id: updatedClient.id,
+        firstName: updatedClient.firstName,
+        lastName: updatedClient.lastName,
+        email: updatedClient.email,
+        phone: updatedClient.phone,
+        googleContactId: updatedClient.googleContactId,
+        interestDescription: updatedClient.interestDescription,
+      });
+    } else {
+      await this.syncContactsService.syncClientToGoogle(updatedClient);
+    }
+
+    return updatedClient;
   }
 
   async remove(id: string) {

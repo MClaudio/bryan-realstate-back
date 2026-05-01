@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
+const schedule_1 = require("@nestjs/schedule");
 const prisma_module_1 = require("./prisma/prisma.module");
 const users_module_1 = require("./users/users.module");
 const auth_module_1 = require("./auth/auth.module");
@@ -20,6 +21,8 @@ const dashboard_module_1 = require("./dashboard/dashboard.module");
 const processes_module_1 = require("./processes/processes.module");
 const property_interests_module_1 = require("./property-interests/property-interests.module");
 const blacklist_module_1 = require("./blacklist/blacklist.module");
+const google_contacts_module_1 = require("./google-contacts/google-contacts.module");
+const sync_contacts_module_1 = require("./sync-contacts/sync-contacts.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -27,6 +30,7 @@ exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
         imports: [
             config_1.ConfigModule.forRoot({ isGlobal: true }),
+            schedule_1.ScheduleModule.forRoot(),
             prisma_module_1.PrismaModule,
             users_module_1.UsersModule,
             auth_module_1.AuthModule,
@@ -38,6 +42,8 @@ exports.AppModule = AppModule = __decorate([
             processes_module_1.ProcessesModule,
             property_interests_module_1.PropertyInterestsModule,
             blacklist_module_1.BlacklistModule,
+            google_contacts_module_1.GoogleContactsModule,
+            sync_contacts_module_1.SyncContactsModule,
         ],
         controllers: [],
         providers: [],
