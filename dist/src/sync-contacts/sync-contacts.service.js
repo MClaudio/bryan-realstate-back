@@ -19,6 +19,7 @@ const exclusion_service_1 = require("./exclusion.service");
 const config_1 = require("@nestjs/config");
 const cron_1 = require("cron");
 const contact_normalization_1 = require("./utils/contact-normalization");
+const phoneFormatter_1 = require("../utils/phoneFormatter");
 let SyncContactsService = SyncContactsService_1 = class SyncContactsService {
     prisma;
     googleContactsService;
@@ -120,7 +121,7 @@ let SyncContactsService = SyncContactsService_1 = class SyncContactsService {
             return { synced: false, reason: message };
         }
     }
-    async getGooglePreview(forceSync = false) {
+    async getGooglePreview(forceSync = false, includeExisting = false) {
         const [googleContacts, exclusionIndex, existingIndex] = await Promise.all([
             this.googleContactsService.listAllContacts(),
             this.exclusionService.getExclusionIndex(),
@@ -134,7 +135,9 @@ let SyncContactsService = SyncContactsService_1 = class SyncContactsService {
         let skippedExcluded = 0;
         for (const googleContact of googleContacts) {
             const normalizedEmail = (0, contact_normalization_1.normalizeEmail)(googleContact.email);
-            const normalizedPhone = (0, contact_normalization_1.normalizePhone)(googleContact.phone);
+            const phoneInput = googleContact.phone ?? '';
+            const { formatted: formattedPhone, isValid: isValidPhone } = (0, phoneFormatter_1.formatPhoneNumber)(phoneInput);
+            const normalizedPhone = isValidPhone ? (0, contact_normalization_1.normalizePhone)(formattedPhone) : null;
             if (!normalizedEmail && !normalizedPhone) {
                 skippedWithoutIdentifier += 1;
                 continue;
@@ -155,7 +158,7 @@ let SyncContactsService = SyncContactsService_1 = class SyncContactsService {
             const existsInDb = (googleContact.googleContactId && existingIndex.googleIds.has(googleContact.googleContactId)) ||
                 (normalizedEmail && existingIndex.emails.has(normalizedEmail)) ||
                 (normalizedPhone && existingIndex.phones.has(normalizedPhone));
-            if (existsInDb) {
+            if (existsInDb && !includeExisting) {
                 skippedDuplicates += 1;
                 continue;
             }
@@ -164,7 +167,7 @@ let SyncContactsService = SyncContactsService_1 = class SyncContactsService {
                 skippedExcluded += 1;
                 continue;
             }
-            if (!normalizedPhone) {
+            if (!isValidPhone || !normalizedPhone) {
                 skippedWithoutPhone += 1;
                 continue;
             }
@@ -178,7 +181,7 @@ let SyncContactsService = SyncContactsService_1 = class SyncContactsService {
                 lastName,
                 fullName,
                 email: normalizedEmail,
-                phone: normalizedPhone,
+                phone: formattedPhone,
                 biography: googleContact.biography ?? null,
             });
         }
@@ -213,13 +216,15 @@ let SyncContactsService = SyncContactsService_1 = class SyncContactsService {
         let invalidIgnored = 0;
         for (const selectedContact of selectedContacts) {
             const normalizedEmail = (0, contact_normalization_1.normalizeEmail)(selectedContact.email);
-            const normalizedPhone = (0, contact_normalization_1.normalizePhone)(selectedContact.phone);
+            const phoneInput = selectedContact.phone ?? '';
+            const { formatted: formattedPhone, isValid: isValidPhone } = (0, phoneFormatter_1.formatPhoneNumber)(phoneInput);
+            const normalizedPhone = isValidPhone ? (0, contact_normalization_1.normalizePhone)(formattedPhone) : null;
             const googleContactId = selectedContact.googleContactId?.trim() || null;
             if (!normalizedEmail && !normalizedPhone) {
                 invalidIgnored += 1;
                 continue;
             }
-            if (!normalizedPhone) {
+            if (!isValidPhone || !normalizedPhone) {
                 invalidIgnored += 1;
                 continue;
             }
@@ -241,19 +246,33 @@ let SyncContactsService = SyncContactsService_1 = class SyncContactsService {
                         OR: [
                             googleContactId ? { googleContactId } : undefined,
                             normalizedEmail ? { email: normalizedEmail } : undefined,
+                            formattedPhone ? { phone: formattedPhone } : undefined,
                             normalizedPhone ? { phone: normalizedPhone } : undefined,
                         ].filter(Boolean),
                     },
                     select: {
                         id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        phone: true,
+                        googleContactId: true,
                         interestDescription: true,
                     },
                 });
+                const nameFromFull = (0, contact_normalization_1.splitFullName)(selectedContact.fullName);
+                const firstName = selectedContact.firstName?.trim() || nameFromFull.firstName;
+                const lastName = selectedContact.lastName?.trim() || nameFromFull.lastName;
                 const incomingBiography = selectedContact.biography?.trim() || null;
-                if (existingClient && existingClient.interestDescription !== incomingBiography) {
+                if (existingClient) {
                     await this.prisma.client.update({
                         where: { id: existingClient.id },
                         data: {
+                            firstName,
+                            lastName,
+                            email: normalizedEmail,
+                            phone: formattedPhone,
+                            googleContactId: googleContactId ?? existingClient.googleContactId,
                             interestDescription: incomingBiography,
                             googleSyncedAt: new Date(),
                         },
@@ -270,7 +289,7 @@ let SyncContactsService = SyncContactsService_1 = class SyncContactsService {
                     firstName,
                     lastName,
                     email: normalizedEmail,
-                    phone: normalizedPhone,
+                    phone: formattedPhone,
                     googleContactId,
                     googleSyncedAt: new Date(),
                     interestDescription: selectedContact.biography?.trim() || null,
@@ -354,7 +373,7 @@ let SyncContactsService = SyncContactsService_1 = class SyncContactsService {
     async syncGoogleToDbCron() {
         this.logger.log('Starting scheduled Google Contacts -> DB sync');
         try {
-            const preview = await this.getGooglePreview(false);
+            const preview = await this.getGooglePreview(false, true);
             const selectedContacts = preview.contacts.map((contact) => ({
                 candidateId: contact.candidateId,
                 googleContactId: contact.googleContactId ?? undefined,

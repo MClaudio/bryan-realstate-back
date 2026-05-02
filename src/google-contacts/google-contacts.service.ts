@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { google, people_v1 } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
 import { normalizeEmail, normalizePhone } from '../sync-contacts/utils/contact-normalization';
+import { formatPhoneNumber } from '../utils/phoneFormatter';
 
 export interface GoogleContactPayload {
   googleContactId?: string | null;
@@ -132,7 +133,13 @@ export class GoogleContactsService {
     const firstName = contact.firstName?.trim() || 'Sin';
     const lastName = contact.lastName?.trim() || 'Nombre';
     const email = normalizeEmail(contact.email);
-    const phone = normalizePhone(contact.phone);
+    const rawPhone = contact.phone?.trim() ?? null;
+    const phone = rawPhone
+      ? (() => {
+          const { formatted, isValid } = formatPhoneNumber(rawPhone);
+          return isValid ? formatted : null;
+        })()
+      : null;
 
     const created = await this.withRetry(() =>
       people.people.createContact({
@@ -172,7 +179,13 @@ export class GoogleContactsService {
     const firstName = contact.firstName?.trim() || 'Sin';
     const lastName = contact.lastName?.trim() || 'Nombre';
     const email = normalizeEmail(contact.email);
-    const phone = normalizePhone(contact.phone);
+    const rawPhone = contact.phone?.trim() ?? null;
+    const phone = rawPhone
+      ? (() => {
+          const { formatted, isValid } = formatPhoneNumber(rawPhone);
+          return isValid ? formatted : null;
+        })()
+      : null;
 
     const updated = await this.withRetry(() =>
       people.people.updateContact({
