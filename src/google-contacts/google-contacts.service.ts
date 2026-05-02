@@ -298,6 +298,7 @@ export class GoogleContactsService {
     const lastName = person.names?.[0]?.familyName ?? null;
     const fullName =
       person.names?.[0]?.displayName ?? (`${firstName ?? ''} ${lastName ?? ''}`.trim() || null);
+    const rawPhone = person.phoneNumbers?.[0]?.value?.trim() || null;
 
     return {
       googleContactId: person.resourceName ?? null,
@@ -305,7 +306,9 @@ export class GoogleContactsService {
       lastName,
       fullName,
       email: normalizeEmail(person.emailAddresses?.[0]?.value ?? null),
-      phone: normalizePhone(person.phoneNumbers?.[0]?.value ?? null),
+      // Keep the original international representation from Google (+country code)
+      // so cron can apply formatPhoneNumber consistently without losing country info.
+      phone: rawPhone,
       biography: person.biographies?.[0]?.value?.trim() || null,
     };
   }

@@ -239,13 +239,14 @@ let GoogleContactsService = GoogleContactsService_1 = class GoogleContactsServic
         const firstName = person.names?.[0]?.givenName ?? null;
         const lastName = person.names?.[0]?.familyName ?? null;
         const fullName = person.names?.[0]?.displayName ?? (`${firstName ?? ''} ${lastName ?? ''}`.trim() || null);
+        const rawPhone = person.phoneNumbers?.[0]?.value?.trim() || null;
         return {
             googleContactId: person.resourceName ?? null,
             firstName,
             lastName,
             fullName,
             email: (0, contact_normalization_1.normalizeEmail)(person.emailAddresses?.[0]?.value ?? null),
-            phone: (0, contact_normalization_1.normalizePhone)(person.phoneNumbers?.[0]?.value ?? null),
+            phone: rawPhone,
             biography: person.biographies?.[0]?.value?.trim() || null,
         };
     }
