@@ -77,7 +77,7 @@ export declare class SyncContactsService implements OnModuleInit {
         synced: boolean;
         reason?: undefined;
     }>;
-    getGooglePreview(forceSync?: boolean): Promise<GooglePreviewResponse>;
+    getGooglePreview(forceSync?: boolean, includeExisting?: boolean): Promise<GooglePreviewResponse>;
     syncGoogleToDb(payload: GoogleToDbSyncDto): Promise<{
         imported: number;
         duplicatesIgnored: number;

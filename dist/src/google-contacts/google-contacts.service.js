@@ -16,6 +16,7 @@ const config_1 = require("@nestjs/config");
 const prisma_service_1 = require("../prisma/prisma.service");
 const googleapis_1 = require("googleapis");
 const contact_normalization_1 = require("../sync-contacts/utils/contact-normalization");
+const phoneFormatter_1 = require("../utils/phoneFormatter");
 let GoogleContactsService = GoogleContactsService_1 = class GoogleContactsService {
     prisma;
     configService;
@@ -107,7 +108,13 @@ let GoogleContactsService = GoogleContactsService_1 = class GoogleContactsServic
         const firstName = contact.firstName?.trim() || 'Sin';
         const lastName = contact.lastName?.trim() || 'Nombre';
         const email = (0, contact_normalization_1.normalizeEmail)(contact.email);
-        const phone = (0, contact_normalization_1.normalizePhone)(contact.phone);
+        const rawPhone = contact.phone?.trim() ?? null;
+        const phone = rawPhone
+            ? (() => {
+                const { formatted, isValid } = (0, phoneFormatter_1.formatPhoneNumber)(rawPhone);
+                return isValid ? formatted : null;
+            })()
+            : null;
         const created = await this.withRetry(() => people.people.createContact({
             requestBody: {
                 names: [
@@ -134,7 +141,13 @@ let GoogleContactsService = GoogleContactsService_1 = class GoogleContactsServic
         const firstName = contact.firstName?.trim() || 'Sin';
         const lastName = contact.lastName?.trim() || 'Nombre';
         const email = (0, contact_normalization_1.normalizeEmail)(contact.email);
-        const phone = (0, contact_normalization_1.normalizePhone)(contact.phone);
+        const rawPhone = contact.phone?.trim() ?? null;
+        const phone = rawPhone
+            ? (() => {
+                const { formatted, isValid } = (0, phoneFormatter_1.formatPhoneNumber)(rawPhone);
+                return isValid ? formatted : null;
+            })()
+            : null;
         const updated = await this.withRetry(() => people.people.updateContact({
             resourceName: googleContactId,
             updatePersonFields: 'names,emailAddresses,phoneNumbers,biographies',

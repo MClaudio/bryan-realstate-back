@@ -14,6 +14,7 @@ import {
     normalizePhone,
     splitFullName,
 } from './utils/contact-normalization';
+import { formatPhoneNumber } from '../utils/phoneFormatter';
 
 interface ExistingClientIndex {
     emails: Set<string>;
@@ -179,7 +180,7 @@ export class SyncContactsService implements OnModuleInit {
         }
     }
 
-    async getGooglePreview(forceSync = false): Promise<GooglePreviewResponse> {
+    async getGooglePreview(forceSync = false, includeExisting = false): Promise<GooglePreviewResponse> {
         const [googleContacts, exclusionIndex, existingIndex] = await Promise.all([
             this.googleContactsService.listAllContacts(),
             this.exclusionService.getExclusionIndex(),
@@ -195,7 +196,9 @@ export class SyncContactsService implements OnModuleInit {
 
         for (const googleContact of googleContacts) {
             const normalizedEmail = normalizeEmail(googleContact.email);
-            const normalizedPhone = normalizePhone(googleContact.phone);
+            const phoneInput = googleContact.phone ?? '';
+            const { formatted: formattedPhone, isValid: isValidPhone } = formatPhoneNumber(phoneInput);
+            const normalizedPhone = isValidPhone ? normalizePhone(formattedPhone) : null;
 
             if (!normalizedEmail && !normalizedPhone) {
                 skippedWithoutIdentifier += 1;
@@ -225,7 +228,7 @@ export class SyncContactsService implements OnModuleInit {
                 (normalizedEmail && existingIndex.emails.has(normalizedEmail)) ||
                 (normalizedPhone && existingIndex.phones.has(normalizedPhone));
 
-            if (existsInDb) {
+            if (existsInDb && !includeExisting) {
                 skippedDuplicates += 1;
                 continue;
             }
@@ -241,7 +244,7 @@ export class SyncContactsService implements OnModuleInit {
                 continue;
             }
 
-            if (!normalizedPhone) {
+            if (!isValidPhone || !normalizedPhone) {
                 skippedWithoutPhone += 1;
                 continue;
             }
@@ -257,7 +260,7 @@ export class SyncContactsService implements OnModuleInit {
                 lastName,
                 fullName,
                 email: normalizedEmail,
-                phone: normalizedPhone,
+                phone: formattedPhone,
                 biography: googleContact.biography ?? null,
             });
         }
@@ -302,7 +305,9 @@ export class SyncContactsService implements OnModuleInit {
 
         for (const selectedContact of selectedContacts) {
             const normalizedEmail = normalizeEmail(selectedContact.email);
-            const normalizedPhone = normalizePhone(selectedContact.phone);
+            const phoneInput = selectedContact.phone ?? '';
+            const { formatted: formattedPhone, isValid: isValidPhone } = formatPhoneNumber(phoneInput);
+            const normalizedPhone = isValidPhone ? normalizePhone(formattedPhone) : null;
             const googleContactId = selectedContact.googleContactId?.trim() || null;
 
             if (!normalizedEmail && !normalizedPhone) {
@@ -310,7 +315,7 @@ export class SyncContactsService implements OnModuleInit {
                 continue;
             }
 
-            if (!normalizedPhone) {
+            if (!isValidPhone || !normalizedPhone) {
                 invalidIgnored += 1;
                 continue;
             }
@@ -341,20 +346,34 @@ export class SyncContactsService implements OnModuleInit {
                         OR: [
                             googleContactId ? { googleContactId } : undefined,
                             normalizedEmail ? { email: normalizedEmail } : undefined,
+                            formattedPhone ? { phone: formattedPhone } : undefined,
                             normalizedPhone ? { phone: normalizedPhone } : undefined,
-                        ].filter(Boolean) as Array<{ googleContactId?: string; email?: string; phone?: string }>,
+                        ].filter(Boolean) as Array<{ googleContactId?: string; email?: string | null; phone?: string }>,
                     },
                     select: {
                         id: true,
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        phone: true,
+                        googleContactId: true,
                         interestDescription: true,
                     },
                 });
 
+                const nameFromFull = splitFullName(selectedContact.fullName);
+                const firstName = selectedContact.firstName?.trim() || nameFromFull.firstName;
+                const lastName = selectedContact.lastName?.trim() || nameFromFull.lastName;
                 const incomingBiography = selectedContact.biography?.trim() || null;
-                if (existingClient && existingClient.interestDescription !== incomingBiography) {
+                if (existingClient) {
                     await this.prisma.client.update({
                         where: { id: existingClient.id },
                         data: {
+                            firstName,
+                            lastName,
+                            email: normalizedEmail,
+                            phone: formattedPhone,
+                            googleContactId: googleContactId ?? existingClient.googleContactId,
                             interestDescription: incomingBiography,
                             googleSyncedAt: new Date(),
                         },
@@ -374,7 +393,7 @@ export class SyncContactsService implements OnModuleInit {
                     firstName,
                     lastName,
                     email: normalizedEmail,
-                    phone: normalizedPhone,
+                    phone: formattedPhone,
                     googleContactId,
                     googleSyncedAt: new Date(),
                     interestDescription: selectedContact.biography?.trim() || null,
@@ -468,7 +487,7 @@ export class SyncContactsService implements OnModuleInit {
         this.logger.log('Starting scheduled Google Contacts -> DB sync');
 
         try {
-            const preview = await this.getGooglePreview(false);
+            const preview = await this.getGooglePreview(false, true);
             const selectedContacts: GoogleContactSelectionDto[] = preview.contacts.map((contact) => ({
                 candidateId: contact.candidateId,
                 googleContactId: contact.googleContactId ?? undefined,

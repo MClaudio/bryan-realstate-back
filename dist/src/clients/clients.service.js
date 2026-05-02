@@ -47,6 +47,7 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const bcrypt = __importStar(require("bcrypt"));
 const sync_contacts_service_1 = require("../sync-contacts/sync-contacts.service");
+const phoneFormatter_1 = require("../utils/phoneFormatter");
 let ClientsService = class ClientsService {
     prisma;
     syncContactsService;
@@ -63,6 +64,13 @@ let ClientsService = class ClientsService {
                 throw new common_1.ConflictException(`Client with email ${createClientDto.email} already exists`);
             }
         }
+        if (!createClientDto.phone || !createClientDto.phone.trim()) {
+            throw new common_1.BadRequestException('El teléfono es requerido');
+        }
+        if (!(0, phoneFormatter_1.validatePhoneNumber)(createClientDto.phone)) {
+            throw new common_1.BadRequestException('El número telefónico es inválido. Debe incluir código de país y tener al menos 7 dígitos (ej: +593978961341 o 0978961341)');
+        }
+        const { formatted: formattedPhone } = (0, phoneFormatter_1.formatPhoneNumber)(createClientDto.phone);
         const { password, ...clientData } = createClientDto;
         let passwordHash = undefined;
         if (password) {
@@ -72,6 +80,7 @@ let ClientsService = class ClientsService {
         const createdClient = await this.prisma.client.create({
             data: {
                 ...clientData,
+                phone: formattedPhone,
                 password: passwordHash,
             },
         });
@@ -116,6 +125,16 @@ let ClientsService = class ClientsService {
             throw new common_1.NotFoundException(`Client with ID ${id} not found`);
         const { password, ...updateData } = updateClientDto;
         const data = { ...updateData };
+        if (updateData.phone) {
+            if (!updateData.phone.trim()) {
+                throw new common_1.BadRequestException('El teléfono no puede estar vacío');
+            }
+            if (!(0, phoneFormatter_1.validatePhoneNumber)(updateData.phone)) {
+                throw new common_1.BadRequestException('El número telefónico es inválido. Debe incluir código de país y tener al menos 7 dígitos (ej: +593978961341 o 0978961341)');
+            }
+            const { formatted: formattedPhone } = (0, phoneFormatter_1.formatPhoneNumber)(updateData.phone);
+            data.phone = formattedPhone;
+        }
         if (password) {
             const salt = await bcrypt.genSalt();
             data.password = await bcrypt.hash(password, salt);

@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { SyncContactsService } from '../sync-contacts/sync-contacts.service';
+import { formatPhoneNumber, validatePhoneNumber } from '../utils/phoneFormatter';
 
 @Injectable()
 export class ClientsService {
@@ -22,6 +23,19 @@ export class ClientsService {
       }
     }
 
+    // Validar y formatear teléfono
+    if (!createClientDto.phone || !createClientDto.phone.trim()) {
+      throw new BadRequestException('El teléfono es requerido');
+    }
+
+    if (!validatePhoneNumber(createClientDto.phone)) {
+      throw new BadRequestException(
+        'El número telefónico es inválido. Debe incluir código de país y tener al menos 7 dígitos (ej: +593978961341 o 0978961341)'
+      );
+    }
+
+    const { formatted: formattedPhone } = formatPhoneNumber(createClientDto.phone);
+
     const { password, ...clientData } = createClientDto;
     let passwordHash = undefined;
 
@@ -33,6 +47,7 @@ export class ClientsService {
     const createdClient = await this.prisma.client.create({
       data: {
         ...clientData,
+        phone: formattedPhone,
         password: passwordHash,
       },
     });
@@ -84,6 +99,22 @@ export class ClientsService {
 
     const { password, ...updateData } = updateClientDto;
     const data: any = { ...updateData };
+
+    // Validar y formatear teléfono si se proporciona
+    if (updateData.phone) {
+      if (!updateData.phone.trim()) {
+        throw new BadRequestException('El teléfono no puede estar vacío');
+      }
+
+      if (!validatePhoneNumber(updateData.phone)) {
+        throw new BadRequestException(
+          'El número telefónico es inválido. Debe incluir código de país y tener al menos 7 dígitos (ej: +593978961341 o 0978961341)'
+        );
+      }
+
+      const { formatted: formattedPhone } = formatPhoneNumber(updateData.phone);
+      data.phone = formattedPhone;
+    }
 
     if (password) {
       const salt = await bcrypt.genSalt();
