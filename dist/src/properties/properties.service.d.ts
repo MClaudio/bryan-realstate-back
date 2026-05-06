@@ -2,10 +2,13 @@ import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { PropertyRecommendationService } from './property-recommendation.service';
 export declare class PropertiesService {
     private prisma;
-    constructor(prisma: PrismaService);
+    private readonly propertyRecommendationService;
+    constructor(prisma: PrismaService, propertyRecommendationService: PropertyRecommendationService);
     create(createPropertyDto: CreatePropertyDto): Promise<{
+        recommendedCandidates: import("./property-recommendation.service").RecommendedCandidate[];
         advisor: {
             firstName: string;
             lastName: string;
@@ -34,7 +37,6 @@ export declare class PropertiesService {
             fileId: string;
             propertyId: string;
         })[];
-    } & {
         address: string;
         isActive: boolean;
         id: string;
@@ -340,7 +342,12 @@ export declare class PropertiesService {
         negotiationClientId: string | null;
         deletedAt: Date | null;
     }>;
+    recommendForProperty(id: string): Promise<{
+        propertyId: string;
+        recommendedCandidates: import("./property-recommendation.service").RecommendedCandidate[];
+    }>;
     update(id: string, updatePropertyDto: UpdatePropertyDto): Promise<{
+        recommendedCandidates: import("./property-recommendation.service").RecommendedCandidate[];
         advisor: {
             firstName: string;
             lastName: string;
@@ -369,7 +376,6 @@ export declare class PropertiesService {
             fileId: string;
             propertyId: string;
         })[];
-    } & {
         address: string;
         isActive: boolean;
         id: string;

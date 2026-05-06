@@ -16,6 +16,12 @@ export class PropertiesController {
     return this.propertiesService.resolveMapsUrl(url);
   }
 
+  @Post(':id/recommendations')
+  @UseGuards(JwtAuthGuard)
+  recommendForProperty(@Param('id') id: string) {
+    return this.propertiesService.recommendForProperty(id);
+  }
+
   @Post()
   @UseGuards(JwtAuthGuard)
   create(@Body() createPropertyDto: CreatePropertyDto) {

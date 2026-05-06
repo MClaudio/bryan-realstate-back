@@ -3,6 +3,7 @@ import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { PropertyStatus, FileType, Prisma } from '@prisma/client';
+import { PropertyRecommendationService } from './property-recommendation.service';
 
 const dmmfModels: Array<{ name: string; fields: Array<{ name: string }> }> =
   (Prisma as any).dmmf?.datamodel?.models ?? [];
@@ -16,7 +17,10 @@ function omitUndefined<T extends Record<string, any>>(obj: T): T {
 
 @Injectable()
 export class PropertiesService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private readonly propertyRecommendationService: PropertyRecommendationService,
+  ) { }
 
   async create(createPropertyDto: CreatePropertyDto) {
     const { fileIds, documentFileIds, advisorId, negotiationClientId, ...propertyData } = createPropertyDto as CreatePropertyDto & { negotiationClientId?: string };
@@ -94,7 +98,14 @@ export class PropertiesService {
       }
     });
 
-    return property;
+    const recommendedCandidates = await this.propertyRecommendationService.recommendCandidates(
+      property,
+    );
+
+    return {
+      ...property,
+      recommendedCandidates,
+    };
   }
 
   async findAll() {
@@ -226,6 +237,17 @@ export class PropertiesService {
     return property;
   }
 
+  async recommendForProperty(id: string) {
+    const property = await this.findOne(id);
+    const recommendedCandidates =
+      await this.propertyRecommendationService.recommendCandidates(property);
+
+    return {
+      propertyId: id,
+      recommendedCandidates,
+    };
+  }
+
   async update(id: string, updatePropertyDto: UpdatePropertyDto) {
     const property = await this.prisma.property.findUnique({ where: { id } });
     if (!property) throw new NotFoundException(`Property with ID ${id} not found`);
@@ -328,7 +350,15 @@ export class PropertiesService {
     });
 
     console.log('Updated property with files:', updatedProperty.files?.length || 0);
-    return updatedProperty;
+
+    const recommendedCandidates = await this.propertyRecommendationService.recommendCandidates(
+      updatedProperty,
+    );
+
+    return {
+      ...updatedProperty,
+      recommendedCandidates,
+    };
   }
 
   async remove(id: string) {

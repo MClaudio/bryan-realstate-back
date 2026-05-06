@@ -9,7 +9,12 @@ export declare class PropertiesController {
         longitude: string;
         resolvedUrl: string;
     }>;
+    recommendForProperty(id: string): Promise<{
+        propertyId: string;
+        recommendedCandidates: import("./property-recommendation.service").RecommendedCandidate[];
+    }>;
     create(createPropertyDto: CreatePropertyDto): Promise<{
+        recommendedCandidates: import("./property-recommendation.service").RecommendedCandidate[];
         advisor: {
             firstName: string;
             lastName: string;
@@ -38,7 +43,6 @@ export declare class PropertiesController {
             fileId: string;
             propertyId: string;
         })[];
-    } & {
         address: string;
         isActive: boolean;
         id: string;
@@ -412,6 +416,7 @@ export declare class PropertiesController {
         deletedAt: Date | null;
     }>;
     update(id: string, updatePropertyDto: UpdatePropertyDto): Promise<{
+        recommendedCandidates: import("./property-recommendation.service").RecommendedCandidate[];
         advisor: {
             firstName: string;
             lastName: string;
@@ -440,7 +445,6 @@ export declare class PropertiesController {
             fileId: string;
             propertyId: string;
         })[];
-    } & {
         address: string;
         isActive: boolean;
         id: string;

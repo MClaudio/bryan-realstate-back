@@ -13,6 +13,7 @@ exports.PropertiesService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const client_1 = require("@prisma/client");
+const property_recommendation_service_1 = require("./property-recommendation.service");
 const dmmfModels = client_1.Prisma.dmmf?.datamodel?.models ?? [];
 const propertyModelFields = new Set(dmmfModels.find((m) => m.name === 'Property')?.fields.map((f) => f.name) ?? []);
 function omitUndefined(obj) {
@@ -20,8 +21,10 @@ function omitUndefined(obj) {
 }
 let PropertiesService = class PropertiesService {
     prisma;
-    constructor(prisma) {
+    propertyRecommendationService;
+    constructor(prisma, propertyRecommendationService) {
         this.prisma = prisma;
+        this.propertyRecommendationService = propertyRecommendationService;
     }
     async create(createPropertyDto) {
         const { fileIds, documentFileIds, advisorId, negotiationClientId, ...propertyData } = createPropertyDto;
@@ -92,7 +95,11 @@ let PropertiesService = class PropertiesService {
                 }
             }
         });
-        return property;
+        const recommendedCandidates = await this.propertyRecommendationService.recommendCandidates(property);
+        return {
+            ...property,
+            recommendedCandidates,
+        };
     }
     async findAll() {
         return this.prisma.property.findMany({
@@ -215,6 +222,14 @@ let PropertiesService = class PropertiesService {
         }
         return property;
     }
+    async recommendForProperty(id) {
+        const property = await this.findOne(id);
+        const recommendedCandidates = await this.propertyRecommendationService.recommendCandidates(property);
+        return {
+            propertyId: id,
+            recommendedCandidates,
+        };
+    }
     async update(id, updatePropertyDto) {
         const property = await this.prisma.property.findUnique({ where: { id } });
         if (!property)
@@ -302,7 +317,11 @@ let PropertiesService = class PropertiesService {
             }
         });
         console.log('Updated property with files:', updatedProperty.files?.length || 0);
-        return updatedProperty;
+        const recommendedCandidates = await this.propertyRecommendationService.recommendCandidates(updatedProperty);
+        return {
+            ...updatedProperty,
+            recommendedCandidates,
+        };
     }
     async remove(id) {
         const property = await this.prisma.property.findUnique({ where: { id } });
@@ -363,6 +382,7 @@ let PropertiesService = class PropertiesService {
 exports.PropertiesService = PropertiesService;
 exports.PropertiesService = PropertiesService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        property_recommendation_service_1.PropertyRecommendationService])
 ], PropertiesService);
 //# sourceMappingURL=properties.service.js.map
