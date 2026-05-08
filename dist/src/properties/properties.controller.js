@@ -23,13 +23,19 @@ let PropertiesController = class PropertiesController {
     constructor(propertiesService) {
         this.propertiesService = propertiesService;
     }
+    getUserId(req) {
+        return String(req?.user?.userId ?? '');
+    }
     async resolveMapsUrl(url) {
         if (!url)
             throw new common_1.BadRequestException('url query param is required');
         return this.propertiesService.resolveMapsUrl(url);
     }
-    create(createPropertyDto) {
-        return this.propertiesService.create(createPropertyDto);
+    recommendForProperty(id) {
+        return this.propertiesService.recommendForProperty(id);
+    }
+    create(createPropertyDto, req) {
+        return this.propertiesService.create(createPropertyDto, this.getUserId(req));
     }
     findAll() {
         return this.propertiesService.findAll();
@@ -46,8 +52,8 @@ let PropertiesController = class PropertiesController {
     findOne(id) {
         return this.propertiesService.findOne(id);
     }
-    update(id, updatePropertyDto) {
-        return this.propertiesService.update(id, updatePropertyDto);
+    update(id, updatePropertyDto, req) {
+        return this.propertiesService.update(id, updatePropertyDto, this.getUserId(req));
     }
     remove(id) {
         return this.propertiesService.remove(id);
@@ -62,11 +68,20 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], PropertiesController.prototype, "resolveMapsUrl", null);
 __decorate([
+    (0, common_1.Post)(':id/recommendations'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], PropertiesController.prototype, "recommendForProperty", null);
+__decorate([
     (0, common_1.Post)(),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [create_property_dto_1.CreatePropertyDto]),
+    __metadata("design:paramtypes", [create_property_dto_1.CreatePropertyDto, Object]),
     __metadata("design:returntype", void 0)
 ], PropertiesController.prototype, "create", null);
 __decorate([
@@ -108,8 +123,9 @@ __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, update_property_dto_1.UpdatePropertyDto]),
+    __metadata("design:paramtypes", [String, update_property_dto_1.UpdatePropertyDto, Object]),
     __metadata("design:returntype", void 0)
 ], PropertiesController.prototype, "update", null);
 __decorate([

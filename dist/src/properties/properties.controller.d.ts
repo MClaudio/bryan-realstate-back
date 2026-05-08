@@ -4,12 +4,21 @@ import { UpdatePropertyDto } from './dto/update-property.dto';
 export declare class PropertiesController {
     private readonly propertiesService;
     constructor(propertiesService: PropertiesService);
+    private getUserId;
     resolveMapsUrl(url: string): Promise<{
         latitude: string;
         longitude: string;
         resolvedUrl: string;
     }>;
-    create(createPropertyDto: CreatePropertyDto): Promise<{
+    recommendForProperty(id: string): Promise<{
+        propertyId: string;
+        recommendationQueued: boolean;
+        recommendedCandidates: import("./property-recommendation.service").RecommendedCandidate[];
+    }>;
+    create(createPropertyDto: CreatePropertyDto, req: any): Promise<{
+        recommendationQueued: boolean;
+        recommendationJobId: string;
+        recommendedCandidates: never[];
         advisor: {
             firstName: string;
             lastName: string;
@@ -27,18 +36,18 @@ export declare class PropertiesController {
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
+                description: string | null;
                 originalName: string;
                 fileName: string;
                 size: number;
-                description: string | null;
             };
         } & {
             createdAt: Date;
+            sortOrder: number;
+            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
-            propertyId: string;
         })[];
-    } & {
         address: string;
         isActive: boolean;
         id: string;
@@ -94,16 +103,17 @@ export declare class PropertiesController {
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
+                description: string | null;
                 originalName: string;
                 fileName: string;
                 size: number;
-                description: string | null;
             };
         } & {
             createdAt: Date;
+            sortOrder: number;
+            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
-            propertyId: string;
         })[];
     } & {
         address: string;
@@ -161,16 +171,17 @@ export declare class PropertiesController {
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
+                description: string | null;
                 originalName: string;
                 fileName: string;
                 size: number;
-                description: string | null;
             };
         } & {
             createdAt: Date;
+            sortOrder: number;
+            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
-            propertyId: string;
         })[];
     } & {
         address: string;
@@ -228,16 +239,17 @@ export declare class PropertiesController {
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
+                description: string | null;
                 originalName: string;
                 fileName: string;
                 size: number;
-                description: string | null;
             };
         } & {
             createdAt: Date;
+            sortOrder: number;
+            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
-            propertyId: string;
         })[];
     } & {
         address: string;
@@ -295,16 +307,17 @@ export declare class PropertiesController {
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
+                description: string | null;
                 originalName: string;
                 fileName: string;
                 size: number;
-                description: string | null;
             };
         } & {
             createdAt: Date;
+            sortOrder: number;
+            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
-            propertyId: string;
         })[];
     } & {
         address: string;
@@ -362,16 +375,17 @@ export declare class PropertiesController {
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
+                description: string | null;
                 originalName: string;
                 fileName: string;
                 size: number;
-                description: string | null;
             };
         } & {
             createdAt: Date;
+            sortOrder: number;
+            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
-            propertyId: string;
         })[];
     } & {
         address: string;
@@ -411,7 +425,10 @@ export declare class PropertiesController {
         negotiationClientId: string | null;
         deletedAt: Date | null;
     }>;
-    update(id: string, updatePropertyDto: UpdatePropertyDto): Promise<{
+    update(id: string, updatePropertyDto: UpdatePropertyDto, req: any): Promise<{
+        recommendationQueued: boolean;
+        recommendationJobId: string;
+        recommendedCandidates: never[];
         advisor: {
             firstName: string;
             lastName: string;
@@ -429,18 +446,18 @@ export declare class PropertiesController {
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
+                description: string | null;
                 originalName: string;
                 fileName: string;
                 size: number;
-                description: string | null;
             };
         } & {
             createdAt: Date;
+            sortOrder: number;
+            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
-            propertyId: string;
         })[];
-    } & {
         address: string;
         isActive: boolean;
         id: string;

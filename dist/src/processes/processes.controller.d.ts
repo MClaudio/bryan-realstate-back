@@ -27,9 +27,9 @@ export declare class ProcessesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        propertyId: string;
         description: string;
         title: string;
+        propertyId: string;
         expenses: import("@prisma/client/runtime/client").JsonValue;
         approximateTime: string | null;
         nextStep: string | null;
@@ -57,9 +57,9 @@ export declare class ProcessesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        propertyId: string;
         description: string;
         title: string;
+        propertyId: string;
         expenses: import("@prisma/client/runtime/client").JsonValue;
         approximateTime: string | null;
         nextStep: string | null;
@@ -87,9 +87,9 @@ export declare class ProcessesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        propertyId: string;
         description: string;
         title: string;
+        propertyId: string;
         expenses: import("@prisma/client/runtime/client").JsonValue;
         approximateTime: string | null;
         nextStep: string | null;
@@ -117,9 +117,9 @@ export declare class ProcessesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        propertyId: string;
         description: string;
         title: string;
+        propertyId: string;
         expenses: import("@prisma/client/runtime/client").JsonValue;
         approximateTime: string | null;
         nextStep: string | null;
@@ -129,9 +129,9 @@ export declare class ProcessesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        propertyId: string;
         description: string;
         title: string;
+        propertyId: string;
         expenses: import("@prisma/client/runtime/client").JsonValue;
         approximateTime: string | null;
         nextStep: string | null;

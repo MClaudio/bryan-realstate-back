@@ -13,6 +13,8 @@ exports.PropertiesService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const client_1 = require("@prisma/client");
+const recommendation_queue_service_1 = require("./recommendation-queue.service");
+const property_recommendation_service_1 = require("./property-recommendation.service");
 const dmmfModels = client_1.Prisma.dmmf?.datamodel?.models ?? [];
 const propertyModelFields = new Set(dmmfModels.find((m) => m.name === 'Property')?.fields.map((f) => f.name) ?? []);
 function omitUndefined(obj) {
@@ -20,10 +22,14 @@ function omitUndefined(obj) {
 }
 let PropertiesService = class PropertiesService {
     prisma;
-    constructor(prisma) {
+    recommendationQueueService;
+    propertyRecommendationService;
+    constructor(prisma, recommendationQueueService, propertyRecommendationService) {
         this.prisma = prisma;
+        this.recommendationQueueService = recommendationQueueService;
+        this.propertyRecommendationService = propertyRecommendationService;
     }
-    async create(createPropertyDto) {
+    async create(createPropertyDto, userId) {
         const { fileIds, documentFileIds, advisorId, negotiationClientId, ...propertyData } = createPropertyDto;
         if (fileIds && fileIds.length > 0) {
             const validFileIds = fileIds.filter((id) => id && typeof id === 'string' && id.length === 36);
@@ -58,13 +64,15 @@ let PropertiesService = class PropertiesService {
                 ...omitUndefined(createData),
                 files: {
                     create: [
-                        ...(fileIds ? fileIds.map((fid) => ({
+                        ...(fileIds ? fileIds.map((fid, index) => ({
                             file: { connect: { id: fid } },
-                            fileType: client_1.FileType.image
+                            fileType: client_1.FileType.image,
+                            sortOrder: index,
                         })) : []),
-                        ...(documentFileIds ? documentFileIds.map((fid) => ({
+                        ...(documentFileIds ? documentFileIds.map((fid, index) => ({
                             file: { connect: { id: fid } },
-                            fileType: client_1.FileType.document
+                            fileType: client_1.FileType.document,
+                            sortOrder: index,
                         })) : [])
                     ]
                 }
@@ -86,13 +94,28 @@ let PropertiesService = class PropertiesService {
                     },
                 },
                 files: {
+                    orderBy: [
+                        { sortOrder: 'asc' },
+                        { createdAt: 'asc' },
+                    ],
                     include: {
                         file: true
                     }
                 }
             }
         });
-        return property;
+        const recommendationJobId = await this.recommendationQueueService.enqueueRecommendation({
+            propertyId: property.id,
+            userId,
+            trigger: 'create',
+            property,
+        });
+        return {
+            ...property,
+            recommendationQueued: true,
+            recommendationJobId,
+            recommendedCandidates: [],
+        };
     }
     async findAll() {
         return this.prisma.property.findMany({
@@ -113,6 +136,10 @@ let PropertiesService = class PropertiesService {
                     },
                 },
                 files: {
+                    orderBy: [
+                        { sortOrder: 'asc' },
+                        { createdAt: 'asc' },
+                    ],
                     include: {
                         file: true
                     }
@@ -144,6 +171,10 @@ let PropertiesService = class PropertiesService {
                     },
                 },
                 files: {
+                    orderBy: [
+                        { sortOrder: 'asc' },
+                        { createdAt: 'asc' },
+                    ],
                     include: {
                         file: true
                     }
@@ -173,6 +204,10 @@ let PropertiesService = class PropertiesService {
                     },
                 },
                 files: {
+                    orderBy: [
+                        { sortOrder: 'asc' },
+                        { createdAt: 'asc' },
+                    ],
                     include: {
                         file: true
                     }
@@ -204,6 +239,10 @@ let PropertiesService = class PropertiesService {
                     },
                 },
                 files: {
+                    orderBy: [
+                        { sortOrder: 'asc' },
+                        { createdAt: 'asc' },
+                    ],
                     include: {
                         file: true
                     }
@@ -215,7 +254,16 @@ let PropertiesService = class PropertiesService {
         }
         return property;
     }
-    async update(id, updatePropertyDto) {
+    async recommendForProperty(id) {
+        const property = await this.findOne(id);
+        const recommendedCandidates = await this.propertyRecommendationService.recommendCandidates(property);
+        return {
+            propertyId: id,
+            recommendationQueued: false,
+            recommendedCandidates,
+        };
+    }
+    async update(id, updatePropertyDto, userId) {
         const property = await this.prisma.property.findUnique({ where: { id } });
         if (!property)
             throw new common_1.NotFoundException(`Property with ID ${id} not found`);
@@ -259,13 +307,15 @@ let PropertiesService = class PropertiesService {
             });
             console.log('Deleted existing file relations');
             const fileRelations = [
-                ...(fileIds ? fileIds.map(fid => ({
+                ...(fileIds ? fileIds.map((fid, index) => ({
                     file: { connect: { id: fid } },
-                    fileType: client_1.FileType.image
+                    fileType: client_1.FileType.image,
+                    sortOrder: index,
                 })) : []),
-                ...(documentFileIds ? documentFileIds.map(fid => ({
+                ...(documentFileIds ? documentFileIds.map((fid, index) => ({
                     file: { connect: { id: fid } },
-                    fileType: client_1.FileType.document
+                    fileType: client_1.FileType.document,
+                    sortOrder: index,
                 })) : [])
             ];
             console.log('File relations to create:', fileRelations.length);
@@ -295,6 +345,10 @@ let PropertiesService = class PropertiesService {
                     },
                 },
                 files: {
+                    orderBy: [
+                        { sortOrder: 'asc' },
+                        { createdAt: 'asc' },
+                    ],
                     include: {
                         file: true
                     }
@@ -302,7 +356,18 @@ let PropertiesService = class PropertiesService {
             }
         });
         console.log('Updated property with files:', updatedProperty.files?.length || 0);
-        return updatedProperty;
+        const recommendationJobId = await this.recommendationQueueService.enqueueRecommendation({
+            propertyId: id,
+            userId,
+            trigger: 'update',
+            property: updatedProperty,
+        });
+        return {
+            ...updatedProperty,
+            recommendationQueued: true,
+            recommendationJobId,
+            recommendedCandidates: [],
+        };
     }
     async remove(id) {
         const property = await this.prisma.property.findUnique({ where: { id } });
@@ -363,6 +428,8 @@ let PropertiesService = class PropertiesService {
 exports.PropertiesService = PropertiesService;
 exports.PropertiesService = PropertiesService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService])
+    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
+        recommendation_queue_service_1.RecommendationQueueService,
+        property_recommendation_service_1.PropertyRecommendationService])
 ], PropertiesService);
 //# sourceMappingURL=properties.service.js.map

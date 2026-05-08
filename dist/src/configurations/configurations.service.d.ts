@@ -25,10 +25,10 @@ export declare class ConfigurationsService {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            description: string | null;
             originalName: string;
             fileName: string;
             size: number;
-            description: string | null;
         } | null;
     } & {
         email: string | null;

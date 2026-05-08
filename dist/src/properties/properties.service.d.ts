@@ -2,10 +2,17 @@ import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { RecommendationQueueService } from './recommendation-queue.service';
+import { PropertyRecommendationService } from './property-recommendation.service';
 export declare class PropertiesService {
     private prisma;
-    constructor(prisma: PrismaService);
-    create(createPropertyDto: CreatePropertyDto): Promise<{
+    private readonly recommendationQueueService;
+    private readonly propertyRecommendationService;
+    constructor(prisma: PrismaService, recommendationQueueService: RecommendationQueueService, propertyRecommendationService: PropertyRecommendationService);
+    create(createPropertyDto: CreatePropertyDto, userId: string): Promise<{
+        recommendationQueued: boolean;
+        recommendationJobId: string;
+        recommendedCandidates: never[];
         advisor: {
             firstName: string;
             lastName: string;
@@ -23,18 +30,18 @@ export declare class PropertiesService {
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
+                description: string | null;
                 originalName: string;
                 fileName: string;
                 size: number;
-                description: string | null;
             };
         } & {
             createdAt: Date;
+            sortOrder: number;
+            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
-            propertyId: string;
         })[];
-    } & {
         address: string;
         isActive: boolean;
         id: string;
@@ -90,16 +97,17 @@ export declare class PropertiesService {
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
+                description: string | null;
                 originalName: string;
                 fileName: string;
                 size: number;
-                description: string | null;
             };
         } & {
             createdAt: Date;
+            sortOrder: number;
+            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
-            propertyId: string;
         })[];
     } & {
         address: string;
@@ -157,16 +165,17 @@ export declare class PropertiesService {
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
+                description: string | null;
                 originalName: string;
                 fileName: string;
                 size: number;
-                description: string | null;
             };
         } & {
             createdAt: Date;
+            sortOrder: number;
+            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
-            propertyId: string;
         })[];
     } & {
         address: string;
@@ -224,16 +233,17 @@ export declare class PropertiesService {
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
+                description: string | null;
                 originalName: string;
                 fileName: string;
                 size: number;
-                description: string | null;
             };
         } & {
             createdAt: Date;
+            sortOrder: number;
+            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
-            propertyId: string;
         })[];
     } & {
         address: string;
@@ -291,16 +301,17 @@ export declare class PropertiesService {
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
+                description: string | null;
                 originalName: string;
                 fileName: string;
                 size: number;
-                description: string | null;
             };
         } & {
             createdAt: Date;
+            sortOrder: number;
+            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
-            propertyId: string;
         })[];
     } & {
         address: string;
@@ -340,7 +351,15 @@ export declare class PropertiesService {
         negotiationClientId: string | null;
         deletedAt: Date | null;
     }>;
-    update(id: string, updatePropertyDto: UpdatePropertyDto): Promise<{
+    recommendForProperty(id: string): Promise<{
+        propertyId: string;
+        recommendationQueued: boolean;
+        recommendedCandidates: import("./property-recommendation.service").RecommendedCandidate[];
+    }>;
+    update(id: string, updatePropertyDto: UpdatePropertyDto, userId: string): Promise<{
+        recommendationQueued: boolean;
+        recommendationJobId: string;
+        recommendedCandidates: never[];
         advisor: {
             firstName: string;
             lastName: string;
@@ -358,18 +377,18 @@ export declare class PropertiesService {
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
+                description: string | null;
                 originalName: string;
                 fileName: string;
                 size: number;
-                description: string | null;
             };
         } & {
             createdAt: Date;
+            sortOrder: number;
+            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
-            propertyId: string;
         })[];
-    } & {
         address: string;
         isActive: boolean;
         id: string;
