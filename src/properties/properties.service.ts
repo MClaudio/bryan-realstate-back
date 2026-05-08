@@ -3,6 +3,7 @@ import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { PropertyStatus, FileType, Prisma } from '@prisma/client';
+import { RecommendationQueueService } from './recommendation-queue.service';
 import { PropertyRecommendationService } from './property-recommendation.service';
 
 const dmmfModels: Array<{ name: string; fields: Array<{ name: string }> }> =
@@ -19,10 +20,11 @@ function omitUndefined<T extends Record<string, any>>(obj: T): T {
 export class PropertiesService {
   constructor(
     private prisma: PrismaService,
+    private readonly recommendationQueueService: RecommendationQueueService,
     private readonly propertyRecommendationService: PropertyRecommendationService,
   ) { }
 
-  async create(createPropertyDto: CreatePropertyDto) {
+  async create(createPropertyDto: CreatePropertyDto, userId: string) {
     const { fileIds, documentFileIds, advisorId, negotiationClientId, ...propertyData } = createPropertyDto as CreatePropertyDto & { negotiationClientId?: string };
 
     // Validate file IDs if provided
@@ -63,13 +65,15 @@ export class PropertiesService {
         ...omitUndefined(createData),
         files: {
           create: [
-            ...(fileIds ? fileIds.map((fid: string) => ({
+            ...(fileIds ? fileIds.map((fid: string, index: number) => ({
               file: { connect: { id: fid } },
-              fileType: FileType.image
+              fileType: FileType.image,
+              sortOrder: index,
             })) : []),
-            ...(documentFileIds ? documentFileIds.map((fid: string) => ({
+            ...(documentFileIds ? documentFileIds.map((fid: string, index: number) => ({
               file: { connect: { id: fid } },
-              fileType: FileType.document
+              fileType: FileType.document,
+              sortOrder: index,
             })) : [])
           ]
         }
@@ -91,6 +95,10 @@ export class PropertiesService {
           },
         },
         files: {
+          orderBy: [
+            { sortOrder: 'asc' },
+            { createdAt: 'asc' },
+          ],
           include: {
             file: true
           }
@@ -98,13 +106,18 @@ export class PropertiesService {
       }
     });
 
-    const recommendedCandidates = await this.propertyRecommendationService.recommendCandidates(
+    const recommendationJobId = await this.recommendationQueueService.enqueueRecommendation({
+      propertyId: property.id,
+      userId,
+      trigger: 'create',
       property,
-    );
+    });
 
     return {
       ...property,
-      recommendedCandidates,
+      recommendationQueued: true,
+      recommendationJobId,
+      recommendedCandidates: [],
     };
   }
 
@@ -127,6 +140,10 @@ export class PropertiesService {
           },
         },
         files: {
+          orderBy: [
+            { sortOrder: 'asc' },
+            { createdAt: 'asc' },
+          ],
           include: {
             file: true
           }
@@ -159,6 +176,10 @@ export class PropertiesService {
           },
         },
         files: {
+          orderBy: [
+            { sortOrder: 'asc' },
+            { createdAt: 'asc' },
+          ],
           include: {
             file: true
           }
@@ -189,6 +210,10 @@ export class PropertiesService {
           },
         },
         files: {
+          orderBy: [
+            { sortOrder: 'asc' },
+            { createdAt: 'asc' },
+          ],
           include: {
             file: true
           }
@@ -223,6 +248,10 @@ export class PropertiesService {
           },
         },
         files: {
+          orderBy: [
+            { sortOrder: 'asc' },
+            { createdAt: 'asc' },
+          ],
           include: {
             file: true
           }
@@ -244,11 +273,12 @@ export class PropertiesService {
 
     return {
       propertyId: id,
+      recommendationQueued: false,
       recommendedCandidates,
     };
   }
 
-  async update(id: string, updatePropertyDto: UpdatePropertyDto) {
+  async update(id: string, updatePropertyDto: UpdatePropertyDto, userId: string) {
     const property = await this.prisma.property.findUnique({ where: { id } });
     if (!property) throw new NotFoundException(`Property with ID ${id} not found`);
 
@@ -303,13 +333,15 @@ export class PropertiesService {
       console.log('Deleted existing file relations');
 
       const fileRelations = [
-        ...(fileIds ? fileIds.map(fid => ({
+        ...(fileIds ? fileIds.map((fid, index) => ({
           file: { connect: { id: fid } },
-          fileType: FileType.image
+          fileType: FileType.image,
+          sortOrder: index,
         })) : []),
-        ...(documentFileIds ? documentFileIds.map(fid => ({
+        ...(documentFileIds ? documentFileIds.map((fid, index) => ({
           file: { connect: { id: fid } },
-          fileType: FileType.document
+          fileType: FileType.document,
+          sortOrder: index,
         })) : [])
       ];
 
@@ -342,6 +374,10 @@ export class PropertiesService {
           },
         },
         files: {
+          orderBy: [
+            { sortOrder: 'asc' },
+            { createdAt: 'asc' },
+          ],
           include: {
             file: true
           }
@@ -351,13 +387,18 @@ export class PropertiesService {
 
     console.log('Updated property with files:', updatedProperty.files?.length || 0);
 
-    const recommendedCandidates = await this.propertyRecommendationService.recommendCandidates(
-      updatedProperty,
-    );
+    const recommendationJobId = await this.recommendationQueueService.enqueueRecommendation({
+      propertyId: id,
+      userId,
+      trigger: 'update',
+      property: updatedProperty,
+    });
 
     return {
       ...updatedProperty,
-      recommendedCandidates,
+      recommendationQueued: true,
+      recommendationJobId,
+      recommendedCandidates: [],
     };
   }
 

@@ -14,6 +14,7 @@ import { PropertyInterestsModule } from './property-interests/property-interests
 import { BlacklistModule } from './blacklist/blacklist.module';
 import { GoogleContactsModule } from './google-contacts/google-contacts.module';
 import { SyncContactsModule } from './sync-contacts/sync-contacts.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { SyncContactsModule } from './sync-contacts/sync-contacts.module';
     BlacklistModule,
     GoogleContactsModule,
     SyncContactsModule,
+    NotificationsModule,
   ],
   controllers: [],
   providers: [],

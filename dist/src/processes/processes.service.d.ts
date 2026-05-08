@@ -28,9 +28,9 @@ export declare class ProcessesService {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        propertyId: string;
         description: string;
         title: string;
+        propertyId: string;
         expenses: Prisma.JsonValue;
         approximateTime: string | null;
         nextStep: string | null;
@@ -58,9 +58,9 @@ export declare class ProcessesService {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        propertyId: string;
         description: string;
         title: string;
+        propertyId: string;
         expenses: Prisma.JsonValue;
         approximateTime: string | null;
         nextStep: string | null;
@@ -88,9 +88,9 @@ export declare class ProcessesService {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        propertyId: string;
         description: string;
         title: string;
+        propertyId: string;
         expenses: Prisma.JsonValue;
         approximateTime: string | null;
         nextStep: string | null;
@@ -118,9 +118,9 @@ export declare class ProcessesService {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        propertyId: string;
         description: string;
         title: string;
+        propertyId: string;
         expenses: Prisma.JsonValue;
         approximateTime: string | null;
         nextStep: string | null;
@@ -130,9 +130,9 @@ export declare class ProcessesService {
         id: string;
         createdAt: Date;
         updatedAt: Date;
-        propertyId: string;
         description: string;
         title: string;
+        propertyId: string;
         expenses: Prisma.JsonValue;
         approximateTime: string | null;
         nextStep: string | null;

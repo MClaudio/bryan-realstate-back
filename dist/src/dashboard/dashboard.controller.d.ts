@@ -37,16 +37,17 @@ export declare class DashboardController {
                     id: string;
                     createdAt: Date;
                     updatedAt: Date;
+                    description: string | null;
                     originalName: string;
                     fileName: string;
                     size: number;
-                    description: string | null;
                 };
             } & {
                 createdAt: Date;
+                sortOrder: number;
+                propertyId: string;
                 fileType: import("@prisma/client").$Enums.FileType;
                 fileId: string;
-                propertyId: string;
             })[];
         } & {
             address: string;

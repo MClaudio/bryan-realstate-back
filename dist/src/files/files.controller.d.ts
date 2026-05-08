@@ -7,30 +7,30 @@ export declare class FilesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        description: string | null;
         originalName: string;
         fileName: string;
         size: number;
-        description: string | null;
     }>;
     findAll(): Promise<{
         path: string;
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        description: string | null;
         originalName: string;
         fileName: string;
         size: number;
-        description: string | null;
     }[]>;
     findOne(id: string): Promise<{
         path: string;
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        description: string | null;
         originalName: string;
         fileName: string;
         size: number;
-        description: string | null;
     }>;
     getUrl(id: string, req: any): Promise<{
         url: string;
@@ -42,9 +42,9 @@ export declare class FilesController {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        description: string | null;
         originalName: string;
         fileName: string;
         size: number;
-        description: string | null;
     }>;
 }
