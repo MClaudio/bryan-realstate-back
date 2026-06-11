@@ -46,6 +46,12 @@ let PropertiesController = class PropertiesController {
     findFeatured() {
         return this.propertiesService.findFeatured();
     }
+    findCities() {
+        return this.propertiesService.findCities();
+    }
+    getCurrentSequence() {
+        return this.propertiesService.getCurrentSequence();
+    }
     findOnePublic(id) {
         return this.propertiesService.findOnePublic(id);
     }
@@ -103,6 +109,20 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], PropertiesController.prototype, "findFeatured", null);
+__decorate([
+    (0, common_1.Get)('cities'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], PropertiesController.prototype, "findCities", null);
+__decorate([
+    (0, common_1.Get)('current-sequence'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", void 0)
+], PropertiesController.prototype, "getCurrentSequence", null);
 __decorate([
     (0, common_1.Get)('public/:id'),
     __param(0, (0, common_1.Param)('id')),

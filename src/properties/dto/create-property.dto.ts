@@ -12,7 +12,7 @@ import {
   IsNumber,
   ValidateIf,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   PropertyStatus,
   PropertyType,
@@ -22,12 +22,22 @@ import {
 
 export class CreatePropertyDto {
   @IsString()
-  @IsNotEmpty()
-  code: string;
+  @IsOptional()
+  code?: string;
 
   @IsString()
   @IsNotEmpty()
   address: string;
+
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsNotEmpty()
+  @IsUUID()
+  cityId: string;
+
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString()
+  @IsNotEmpty()
+  referenceSector: string;
 
   @IsString()
   @IsNotEmpty()
@@ -58,6 +68,7 @@ export class CreatePropertyDto {
   @IsEnum(PropertyType)
   propertyType: PropertyType;
 
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsInt()
   @IsOptional()
   @Type(() => Number)
@@ -77,6 +88,7 @@ export class CreatePropertyDto {
   @IsEnum(Zone)
   zone: Zone;
 
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsInt()
   @IsOptional()
   @Type(() => Number)

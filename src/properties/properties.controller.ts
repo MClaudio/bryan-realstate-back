@@ -48,6 +48,18 @@ export class PropertiesController {
     return this.propertiesService.findFeatured();
   }
 
+  @Get('cities')
+  @UseGuards(JwtAuthGuard)
+  findCities() {
+    return this.propertiesService.findCities();
+  }
+
+  @Get('current-sequence')
+  @UseGuards(JwtAuthGuard)
+  getCurrentSequence() {
+    return this.propertiesService.getCurrentSequence();
+  }
+
   @Get('public/:id')
   findOnePublic(@Param('id') id: string) {
     return this.propertiesService.findOnePublic(id);

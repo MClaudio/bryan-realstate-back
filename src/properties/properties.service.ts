@@ -12,6 +12,39 @@ const propertyModelFields = new Set(
   dmmfModels.find((m) => m.name === 'Property')?.fields.map((f) => f.name) ?? [],
 );
 
+const propertyInclude = {
+  city: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  advisor: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+    },
+  },
+  negotiationClient: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      phone: true,
+    },
+  },
+  files: {
+    orderBy: [
+      { sortOrder: 'asc' as const },
+      { createdAt: 'asc' as const },
+    ],
+    include: {
+      file: true,
+    },
+  },
+};
+
 function omitUndefined<T extends Record<string, any>>(obj: T): T {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
 }
@@ -24,8 +57,30 @@ export class PropertiesService {
     private readonly propertyRecommendationService: PropertyRecommendationService,
   ) { }
 
+  async getCurrentSequence() {
+    const currentSequence = await this.prisma.property.count();
+    return { currentSequence };
+  }
+
+  async findCities() {
+    return this.prisma.city.findMany({
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+  }
+
   async create(createPropertyDto: CreatePropertyDto, userId: string) {
-    const { fileIds, documentFileIds, advisorId, negotiationClientId, ...propertyData } = createPropertyDto as CreatePropertyDto & { negotiationClientId?: string };
+    const {
+      fileIds,
+      documentFileIds,
+      advisorId,
+      negotiationClientId,
+      cityId,
+      ...propertyData
+    } = createPropertyDto as CreatePropertyDto & { negotiationClientId?: string };
 
     // Validate file IDs if provided
     if (fileIds && fileIds.length > 0) {
@@ -43,7 +98,13 @@ export class PropertiesService {
     }
 
     // Prepare create data, handling advisor relationship
-    const createData: any = { ...propertyData };
+    const createData: any = {
+      ...propertyData,
+      code: typeof propertyData.code === 'string' ? propertyData.code.trim() : '',
+    };
+    if (cityId) {
+      createData.city = { connect: { id: cityId } };
+    }
     if (advisorId) {
       createData.advisor = { connect: { id: advisorId } };
     }
@@ -78,44 +139,24 @@ export class PropertiesService {
           ]
         }
       },
-      include: {
-        advisor: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-        negotiationClient: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-          },
-        },
-        files: {
-          orderBy: [
-            { sortOrder: 'asc' },
-            { createdAt: 'asc' },
-          ],
-          include: {
-            file: true
-          }
-        }
-      }
+      include: propertyInclude,
     });
 
-    const recommendationJobId = await this.recommendationQueueService.enqueueRecommendation({
-      propertyId: property.id,
-      userId,
-      trigger: 'create',
-      property,
-    });
+    let recommendationJobId: string = "";
+    let recommendationQueued = false;
+    if (property.status === PropertyStatus.Nuevo) {
+      recommendationJobId = await this.recommendationQueueService.enqueueRecommendation({
+        propertyId: property.id,
+        userId,
+        trigger: 'create',
+        property,
+      });
+      recommendationQueued = true;
+    }
 
     return {
       ...property,
-      recommendationQueued: true,
+      recommendationQueued,
       recommendationJobId,
       recommendedCandidates: [],
     };
@@ -123,32 +164,7 @@ export class PropertiesService {
 
   async findAll() {
     return this.prisma.property.findMany({
-      include: {
-        advisor: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-        negotiationClient: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-          },
-        },
-        files: {
-          orderBy: [
-            { sortOrder: 'asc' },
-            { createdAt: 'asc' },
-          ],
-          include: {
-            file: true
-          }
-        }
-      },
+      include: propertyInclude,
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -159,32 +175,7 @@ export class PropertiesService {
         isPublic: true,
         isFeatured: true
       } as Prisma.PropertyWhereInput,
-      include: {
-        advisor: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-        negotiationClient: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-          },
-        },
-        files: {
-          orderBy: [
-            { sortOrder: 'asc' },
-            { createdAt: 'asc' },
-          ],
-          include: {
-            file: true
-          }
-        }
-      },
+      include: propertyInclude,
       orderBy: { createdAt: 'desc' },
       take: 6
     });
@@ -193,32 +184,7 @@ export class PropertiesService {
   async findOnePublic(id: string) {
     const property = await this.prisma.property.findFirst({
       where: { id, isPublic: true },
-      include: {
-        advisor: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-        negotiationClient: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-          },
-        },
-        files: {
-          orderBy: [
-            { sortOrder: 'asc' },
-            { createdAt: 'asc' },
-          ],
-          include: {
-            file: true
-          }
-        }
-      },
+      include: propertyInclude,
     });
 
     if (!property) {
@@ -231,32 +197,7 @@ export class PropertiesService {
   async findOne(id: string) {
     const property = await this.prisma.property.findUnique({
       where: { id },
-      include: {
-        advisor: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-        negotiationClient: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-          },
-        },
-        files: {
-          orderBy: [
-            { sortOrder: 'asc' },
-            { createdAt: 'asc' },
-          ],
-          include: {
-            file: true
-          }
-        }
-      },
+      include: propertyInclude,
     });
 
     if (!property) {
@@ -282,12 +223,7 @@ export class PropertiesService {
     const property = await this.prisma.property.findUnique({ where: { id } });
     if (!property) throw new NotFoundException(`Property with ID ${id} not found`);
 
-    const { fileIds, documentFileIds, advisorId, ...propertyData } = updatePropertyDto;
-
-    console.log('=== UPDATING PROPERTY ===');
-    console.log('Property ID:', id);
-    console.log('fileIds received:', fileIds);
-    console.log('documentFileIds received:', documentFileIds);
+    const { fileIds, documentFileIds, advisorId, cityId, ...propertyData } = updatePropertyDto;
 
     // Validate file IDs if provided
     if (fileIds && fileIds.length > 0) {
@@ -307,6 +243,11 @@ export class PropertiesService {
     // Prepare update data, handling advisor relationship and files
     const { negotiationClientId, ...restPropertyData } = propertyData as any;
     const updateData: any = { ...restPropertyData };
+    if (cityId !== undefined) {
+      updateData.city = cityId
+        ? { connect: { id: cityId } }
+        : { disconnect: true };
+    }
     if (advisorId) {
       updateData.advisor = { connect: { id: advisorId } };
     }
@@ -325,12 +266,10 @@ export class PropertiesService {
 
     // Handle files update if provided
     if (fileIds !== undefined || documentFileIds !== undefined) {
-      console.log('Updating files...');
       // First delete existing relations
       await this.prisma.propertyFile.deleteMany({
         where: { propertyId: id }
       });
-      console.log('Deleted existing file relations');
 
       const fileRelations = [
         ...(fileIds ? fileIds.map((fid, index) => ({
@@ -345,8 +284,6 @@ export class PropertiesService {
         })) : [])
       ];
 
-      console.log('File relations to create:', fileRelations.length);
-
       if (fileRelations.length) {
         updateData.files = {
           create: fileRelations
@@ -357,46 +294,26 @@ export class PropertiesService {
     const updatedProperty = await this.prisma.property.update({
       where: { id },
       data: omitUndefined(updateData),
-      include: {
-        advisor: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-        negotiationClient: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-          },
-        },
-        files: {
-          orderBy: [
-            { sortOrder: 'asc' },
-            { createdAt: 'asc' },
-          ],
-          include: {
-            file: true
-          }
-        }
-      }
+      include: propertyInclude,
     });
 
     console.log('Updated property with files:', updatedProperty.files?.length || 0);
 
-    const recommendationJobId = await this.recommendationQueueService.enqueueRecommendation({
-      propertyId: id,
-      userId,
-      trigger: 'update',
-      property: updatedProperty,
-    });
+    let recommendationJobId: string = "";
+    let recommendationQueued = false;
+    if (updatedProperty.status === PropertyStatus.Nuevo) {
+      recommendationJobId = await this.recommendationQueueService.enqueueRecommendation({
+        propertyId: id,
+        userId,
+        trigger: 'update',
+        property: updatedProperty,
+      });
+      recommendationQueued = true;
+    }
 
     return {
       ...updatedProperty,
-      recommendationQueued: true,
+      recommendationQueued,
       recommendationJobId,
       recommendedCandidates: [],
     };

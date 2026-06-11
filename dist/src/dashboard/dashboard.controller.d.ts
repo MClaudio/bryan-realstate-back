@@ -57,6 +57,8 @@ export declare class DashboardController {
             updatedAt: Date;
             status: import("@prisma/client").$Enums.PropertyStatus;
             code: string;
+            cityId: string | null;
+            referenceSector: string | null;
             locationUrl: string;
             constructionArea: import("@prisma/client-runtime-utils").Decimal;
             landArea: import("@prisma/client-runtime-utils").Decimal;
