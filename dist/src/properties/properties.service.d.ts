@@ -9,46 +9,54 @@ export declare class PropertiesService {
     private readonly recommendationQueueService;
     private readonly propertyRecommendationService;
     constructor(prisma: PrismaService, recommendationQueueService: RecommendationQueueService, propertyRecommendationService: PropertyRecommendationService);
+    getCurrentSequence(): Promise<{
+        currentSequence: number;
+    }>;
+    findCities(): Promise<{
+        id: string;
+        name: string;
+    }[]>;
     create(createPropertyDto: CreatePropertyDto, userId: string): Promise<{
         recommendationQueued: boolean;
         recommendationJobId: string;
         recommendedCandidates: never[];
+        city: {
+            id: string;
+            name: string;
+        } | null;
         advisor: {
+            id: string;
             firstName: string;
             lastName: string;
-            id: string;
         };
         negotiationClient: {
+            id: string;
             firstName: string;
             lastName: string;
             phone: string;
-            id: string;
         } | null;
         files: ({
             file: {
-                path: string;
-                id: string;
                 createdAt: Date;
+                id: string;
                 updatedAt: Date;
-                description: string | null;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
+                description: string | null;
             };
         } & {
             createdAt: Date;
             sortOrder: number;
-            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
+            propertyId: string;
         })[];
-        address: string;
-        isActive: boolean;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        status: import("@prisma/client").$Enums.PropertyStatus;
         code: string;
+        address: string;
+        cityId: string | null;
+        referenceSector: string | null;
         locationUrl: string;
         constructionArea: Prisma.Decimal;
         landArea: Prisma.Decimal;
@@ -63,6 +71,7 @@ export declare class PropertiesService {
         zone: import("@prisma/client").$Enums.Zone;
         cityTime: number | null;
         observations: string | null;
+        status: import("@prisma/client").$Enums.PropertyStatus;
         advisorId: string;
         owner: string | null;
         price: Prisma.Decimal;
@@ -71,52 +80,57 @@ export declare class PropertiesService {
         commission: Prisma.Decimal;
         salePrice: Prisma.Decimal | null;
         isPublic: boolean;
+        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
         negotiationClientId: string | null;
+        createdAt: Date;
+        id: string;
+        updatedAt: Date;
         deletedAt: Date | null;
     }>;
     findAll(): Promise<({
+        city: {
+            id: string;
+            name: string;
+        } | null;
         advisor: {
+            id: string;
             firstName: string;
             lastName: string;
-            id: string;
         };
         negotiationClient: {
+            id: string;
             firstName: string;
             lastName: string;
             phone: string;
-            id: string;
         } | null;
         files: ({
             file: {
-                path: string;
-                id: string;
                 createdAt: Date;
+                id: string;
                 updatedAt: Date;
-                description: string | null;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
+                description: string | null;
             };
         } & {
             createdAt: Date;
             sortOrder: number;
-            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
+            propertyId: string;
         })[];
     } & {
-        address: string;
-        isActive: boolean;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        status: import("@prisma/client").$Enums.PropertyStatus;
         code: string;
+        address: string;
+        cityId: string | null;
+        referenceSector: string | null;
         locationUrl: string;
         constructionArea: Prisma.Decimal;
         landArea: Prisma.Decimal;
@@ -131,6 +145,7 @@ export declare class PropertiesService {
         zone: import("@prisma/client").$Enums.Zone;
         cityTime: number | null;
         observations: string | null;
+        status: import("@prisma/client").$Enums.PropertyStatus;
         advisorId: string;
         owner: string | null;
         price: Prisma.Decimal;
@@ -139,52 +154,57 @@ export declare class PropertiesService {
         commission: Prisma.Decimal;
         salePrice: Prisma.Decimal | null;
         isPublic: boolean;
+        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
         negotiationClientId: string | null;
+        createdAt: Date;
+        id: string;
+        updatedAt: Date;
         deletedAt: Date | null;
     })[]>;
     findFeatured(): Promise<({
+        city: {
+            id: string;
+            name: string;
+        } | null;
         advisor: {
+            id: string;
             firstName: string;
             lastName: string;
-            id: string;
         };
         negotiationClient: {
+            id: string;
             firstName: string;
             lastName: string;
             phone: string;
-            id: string;
         } | null;
         files: ({
             file: {
-                path: string;
-                id: string;
                 createdAt: Date;
+                id: string;
                 updatedAt: Date;
-                description: string | null;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
+                description: string | null;
             };
         } & {
             createdAt: Date;
             sortOrder: number;
-            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
+            propertyId: string;
         })[];
     } & {
-        address: string;
-        isActive: boolean;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        status: import("@prisma/client").$Enums.PropertyStatus;
         code: string;
+        address: string;
+        cityId: string | null;
+        referenceSector: string | null;
         locationUrl: string;
         constructionArea: Prisma.Decimal;
         landArea: Prisma.Decimal;
@@ -199,6 +219,7 @@ export declare class PropertiesService {
         zone: import("@prisma/client").$Enums.Zone;
         cityTime: number | null;
         observations: string | null;
+        status: import("@prisma/client").$Enums.PropertyStatus;
         advisorId: string;
         owner: string | null;
         price: Prisma.Decimal;
@@ -207,52 +228,57 @@ export declare class PropertiesService {
         commission: Prisma.Decimal;
         salePrice: Prisma.Decimal | null;
         isPublic: boolean;
+        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
         negotiationClientId: string | null;
+        createdAt: Date;
+        id: string;
+        updatedAt: Date;
         deletedAt: Date | null;
     })[]>;
     findOnePublic(id: string): Promise<{
+        city: {
+            id: string;
+            name: string;
+        } | null;
         advisor: {
+            id: string;
             firstName: string;
             lastName: string;
-            id: string;
         };
         negotiationClient: {
+            id: string;
             firstName: string;
             lastName: string;
             phone: string;
-            id: string;
         } | null;
         files: ({
             file: {
-                path: string;
-                id: string;
                 createdAt: Date;
+                id: string;
                 updatedAt: Date;
-                description: string | null;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
+                description: string | null;
             };
         } & {
             createdAt: Date;
             sortOrder: number;
-            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
+            propertyId: string;
         })[];
     } & {
-        address: string;
-        isActive: boolean;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        status: import("@prisma/client").$Enums.PropertyStatus;
         code: string;
+        address: string;
+        cityId: string | null;
+        referenceSector: string | null;
         locationUrl: string;
         constructionArea: Prisma.Decimal;
         landArea: Prisma.Decimal;
@@ -267,6 +293,7 @@ export declare class PropertiesService {
         zone: import("@prisma/client").$Enums.Zone;
         cityTime: number | null;
         observations: string | null;
+        status: import("@prisma/client").$Enums.PropertyStatus;
         advisorId: string;
         owner: string | null;
         price: Prisma.Decimal;
@@ -275,52 +302,57 @@ export declare class PropertiesService {
         commission: Prisma.Decimal;
         salePrice: Prisma.Decimal | null;
         isPublic: boolean;
+        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
         negotiationClientId: string | null;
+        createdAt: Date;
+        id: string;
+        updatedAt: Date;
         deletedAt: Date | null;
     }>;
     findOne(id: string): Promise<{
+        city: {
+            id: string;
+            name: string;
+        } | null;
         advisor: {
+            id: string;
             firstName: string;
             lastName: string;
-            id: string;
         };
         negotiationClient: {
+            id: string;
             firstName: string;
             lastName: string;
             phone: string;
-            id: string;
         } | null;
         files: ({
             file: {
-                path: string;
-                id: string;
                 createdAt: Date;
+                id: string;
                 updatedAt: Date;
-                description: string | null;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
+                description: string | null;
             };
         } & {
             createdAt: Date;
             sortOrder: number;
-            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
+            propertyId: string;
         })[];
     } & {
-        address: string;
-        isActive: boolean;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        status: import("@prisma/client").$Enums.PropertyStatus;
         code: string;
+        address: string;
+        cityId: string | null;
+        referenceSector: string | null;
         locationUrl: string;
         constructionArea: Prisma.Decimal;
         landArea: Prisma.Decimal;
@@ -335,6 +367,7 @@ export declare class PropertiesService {
         zone: import("@prisma/client").$Enums.Zone;
         cityTime: number | null;
         observations: string | null;
+        status: import("@prisma/client").$Enums.PropertyStatus;
         advisorId: string;
         owner: string | null;
         price: Prisma.Decimal;
@@ -343,12 +376,16 @@ export declare class PropertiesService {
         commission: Prisma.Decimal;
         salePrice: Prisma.Decimal | null;
         isPublic: boolean;
+        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
         negotiationClientId: string | null;
+        createdAt: Date;
+        id: string;
+        updatedAt: Date;
         deletedAt: Date | null;
     }>;
     recommendForProperty(id: string): Promise<{
@@ -360,42 +397,43 @@ export declare class PropertiesService {
         recommendationQueued: boolean;
         recommendationJobId: string;
         recommendedCandidates: never[];
+        city: {
+            id: string;
+            name: string;
+        } | null;
         advisor: {
+            id: string;
             firstName: string;
             lastName: string;
-            id: string;
         };
         negotiationClient: {
+            id: string;
             firstName: string;
             lastName: string;
             phone: string;
-            id: string;
         } | null;
         files: ({
             file: {
-                path: string;
-                id: string;
                 createdAt: Date;
+                id: string;
                 updatedAt: Date;
-                description: string | null;
                 originalName: string;
                 fileName: string;
+                path: string;
                 size: number;
+                description: string | null;
             };
         } & {
             createdAt: Date;
             sortOrder: number;
-            propertyId: string;
             fileType: import("@prisma/client").$Enums.FileType;
             fileId: string;
+            propertyId: string;
         })[];
-        address: string;
-        isActive: boolean;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        status: import("@prisma/client").$Enums.PropertyStatus;
         code: string;
+        address: string;
+        cityId: string | null;
+        referenceSector: string | null;
         locationUrl: string;
         constructionArea: Prisma.Decimal;
         landArea: Prisma.Decimal;
@@ -410,6 +448,7 @@ export declare class PropertiesService {
         zone: import("@prisma/client").$Enums.Zone;
         cityTime: number | null;
         observations: string | null;
+        status: import("@prisma/client").$Enums.PropertyStatus;
         advisorId: string;
         owner: string | null;
         price: Prisma.Decimal;
@@ -418,22 +457,23 @@ export declare class PropertiesService {
         commission: Prisma.Decimal;
         salePrice: Prisma.Decimal | null;
         isPublic: boolean;
+        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
         negotiationClientId: string | null;
+        createdAt: Date;
+        id: string;
+        updatedAt: Date;
         deletedAt: Date | null;
     }>;
     remove(id: string): Promise<{
-        address: string;
-        isActive: boolean;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        status: import("@prisma/client").$Enums.PropertyStatus;
         code: string;
+        address: string;
+        cityId: string | null;
+        referenceSector: string | null;
         locationUrl: string;
         constructionArea: Prisma.Decimal;
         landArea: Prisma.Decimal;
@@ -448,6 +488,7 @@ export declare class PropertiesService {
         zone: import("@prisma/client").$Enums.Zone;
         cityTime: number | null;
         observations: string | null;
+        status: import("@prisma/client").$Enums.PropertyStatus;
         advisorId: string;
         owner: string | null;
         price: Prisma.Decimal;
@@ -456,12 +497,16 @@ export declare class PropertiesService {
         commission: Prisma.Decimal;
         salePrice: Prisma.Decimal | null;
         isPublic: boolean;
+        isActive: boolean;
         isFeatured: boolean;
         facebookUrl: string | null;
         tiktokUrl: string | null;
         instagramUrl: string | null;
         youtubeUrl: string | null;
         negotiationClientId: string | null;
+        createdAt: Date;
+        id: string;
+        updatedAt: Date;
         deletedAt: Date | null;
     }>;
     resolveMapsUrl(url: string): Promise<{

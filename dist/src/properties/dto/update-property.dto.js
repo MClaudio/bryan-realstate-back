@@ -16,6 +16,8 @@ const client_1 = require("@prisma/client");
 class UpdatePropertyDto {
     code;
     address;
+    cityId;
+    referenceSector;
     locationUrl;
     constructionArea;
     landArea;
@@ -61,6 +63,18 @@ __decorate([
     __metadata("design:type", String)
 ], UpdatePropertyDto.prototype, "address", void 0);
 __decorate([
+    (0, class_transformer_1.Transform)(({ value }) => (typeof value === 'string' ? value.trim() : value)),
+    (0, class_validator_1.IsUUID)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], UpdatePropertyDto.prototype, "cityId", void 0);
+__decorate([
+    (0, class_transformer_1.Transform)(({ value }) => (typeof value === 'string' ? value.trim() : value)),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], UpdatePropertyDto.prototype, "referenceSector", void 0);
+__decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
@@ -101,6 +115,7 @@ __decorate([
     __metadata("design:type", String)
 ], UpdatePropertyDto.prototype, "propertyType", void 0);
 __decorate([
+    (0, class_transformer_1.Transform)(({ value }) => (value === '' ? undefined : value)),
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
@@ -129,6 +144,7 @@ __decorate([
     __metadata("design:type", String)
 ], UpdatePropertyDto.prototype, "zone", void 0);
 __decorate([
+    (0, class_transformer_1.Transform)(({ value }) => (value === '' ? undefined : value)),
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),

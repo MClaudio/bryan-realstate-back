@@ -1,7 +1,9 @@
 import { PropertyStatus, PropertyType, Topography, Zone } from '@prisma/client';
 export declare class CreatePropertyDto {
-    code: string;
+    code?: string;
     address: string;
+    cityId: string;
+    referenceSector: string;
     locationUrl: string;
     constructionArea: number;
     landArea: number;

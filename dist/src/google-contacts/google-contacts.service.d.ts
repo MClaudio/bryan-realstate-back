@@ -29,4 +29,5 @@ export declare class GoogleContactsService {
     private persistTokens;
     private mapPerson;
     private withRetry;
+    private handleInvalidGrantError;
 }

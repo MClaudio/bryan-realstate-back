@@ -202,9 +202,17 @@ let GoogleContactsService = GoogleContactsService_1 = class GoogleContactsServic
         });
         const isExpired = token.expiryDate ? token.expiryDate.getTime() <= Date.now() : false;
         if (isExpired && token.refreshToken) {
-            const { credentials } = await oauthClient.refreshAccessToken();
-            await this.persistTokens(credentials);
-            oauthClient.setCredentials(credentials);
+            try {
+                const { credentials } = await oauthClient.refreshAccessToken();
+                await this.persistTokens(credentials);
+                oauthClient.setCredentials(credentials);
+            }
+            catch (error) {
+                if (await this.handleInvalidGrantError(error)) {
+                    throw new common_1.BadRequestException('La autorización de Google expiró o fue revocada. Vuelve a conectar Google Contacts.');
+                }
+                throw error;
+            }
         }
         return oauthClient;
     }
@@ -258,6 +266,9 @@ let GoogleContactsService = GoogleContactsService_1 = class GoogleContactsServic
             }
             catch (error) {
                 currentError = error;
+                if (await this.handleInvalidGrantError(error)) {
+                    throw new common_1.BadRequestException('La autorización de Google expiró o fue revocada. Vuelve a conectar Google Contacts.');
+                }
                 const status = error?.code ??
                     error?.response?.status;
                 const shouldRetry = status === 429 || status === 500 || status === 502 || status === 503;
@@ -269,6 +280,21 @@ let GoogleContactsService = GoogleContactsService_1 = class GoogleContactsServic
             }
         }
         throw currentError;
+    }
+    async handleInvalidGrantError(error) {
+        const gaxiosError = error;
+        const message = gaxiosError.message?.toLowerCase() ?? '';
+        const responseError = gaxiosError.response?.data?.error?.toLowerCase() ?? '';
+        const responseDescription = gaxiosError.response?.data?.error_description?.toLowerCase() ?? '';
+        const isInvalidGrant = message.includes('invalid_grant') ||
+            responseError === 'invalid_grant' ||
+            responseDescription.includes('invalid_grant');
+        if (!isInvalidGrant) {
+            return false;
+        }
+        this.logger.warn('Google OAuth devolvió invalid_grant. Se limpiará el token local para requerir reconexión.');
+        await this.prisma.googleAuthToken.deleteMany({ where: { provider: 'google' } });
+        return true;
     }
 };
 exports.GoogleContactsService = GoogleContactsService;

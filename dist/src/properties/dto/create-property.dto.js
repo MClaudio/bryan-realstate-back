@@ -16,6 +16,8 @@ const client_1 = require("@prisma/client");
 class CreatePropertyDto {
     code;
     address;
+    cityId;
+    referenceSector;
     locationUrl;
     constructionArea;
     landArea;
@@ -52,7 +54,7 @@ class CreatePropertyDto {
 exports.CreatePropertyDto = CreatePropertyDto;
 __decorate([
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreatePropertyDto.prototype, "code", void 0);
 __decorate([
@@ -60,6 +62,18 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], CreatePropertyDto.prototype, "address", void 0);
+__decorate([
+    (0, class_transformer_1.Transform)(({ value }) => (typeof value === 'string' ? value.trim() : value)),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.IsUUID)(),
+    __metadata("design:type", String)
+], CreatePropertyDto.prototype, "cityId", void 0);
+__decorate([
+    (0, class_transformer_1.Transform)(({ value }) => (typeof value === 'string' ? value.trim() : value)),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], CreatePropertyDto.prototype, "referenceSector", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsNotEmpty)(),
@@ -97,6 +111,7 @@ __decorate([
     __metadata("design:type", String)
 ], CreatePropertyDto.prototype, "propertyType", void 0);
 __decorate([
+    (0, class_transformer_1.Transform)(({ value }) => (value === '' ? undefined : value)),
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
@@ -121,6 +136,7 @@ __decorate([
     __metadata("design:type", String)
 ], CreatePropertyDto.prototype, "zone", void 0);
 __decorate([
+    (0, class_transformer_1.Transform)(({ value }) => (value === '' ? undefined : value)),
     (0, class_validator_1.IsInt)(),
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),

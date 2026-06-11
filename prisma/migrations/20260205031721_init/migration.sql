@@ -11,7 +11,7 @@ CREATE TYPE "Topography" AS ENUM ('Plano', 'Semiplano', 'Pendiente', 'Mixto');
 CREATE TYPE "Zone" AS ENUM ('Rural', 'Urbano', 'Urbanización');
 
 -- CreateEnum
-CREATE TYPE "PropertyStatus" AS ENUM ('En Venta', 'Negociación', 'Vendido');
+CREATE TYPE "PropertyStatus" AS ENUM ('Nuevo', 'Negociación', 'Vendido');
 
 -- CreateEnum
 CREATE TYPE "FileType" AS ENUM ('image', 'document');
@@ -73,7 +73,7 @@ CREATE TABLE "properties" (
     "zone" "Zone" NOT NULL,
     "city_time" INTEGER,
     "observations" TEXT,
-    "status" "PropertyStatus" NOT NULL DEFAULT 'En Venta',
+    "status" "PropertyStatus" NOT NULL DEFAULT 'Nuevo',
     "advisor_id" UUID NOT NULL,
     "owner" TEXT,
     "price" DECIMAL(12,2) NOT NULL,
