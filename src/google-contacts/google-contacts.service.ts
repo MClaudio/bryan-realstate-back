@@ -2,7 +2,6 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { google, people_v1 } from 'googleapis';
-import { OAuth2Client } from 'google-auth-library';
 import { normalizeEmail, normalizePhone } from '../sync-contacts/utils/contact-normalization';
 import { formatPhoneNumber } from '../utils/phoneFormatter';
 
@@ -215,7 +214,7 @@ export class GoogleContactsService {
     return google.people({ version: 'v1', auth: oauthClient });
   }
 
-  private createOAuthClient(): OAuth2Client {
+  private createOAuthClient(): InstanceType<typeof google.auth.OAuth2> {
     const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
     const clientSecret = this.configService.get<string>('GOOGLE_CLIENT_SECRET');
     const redirectUri = this.configService.get<string>('GOOGLE_REDIRECT_URI');
@@ -229,7 +228,7 @@ export class GoogleContactsService {
     return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
   }
 
-  private async getAuthorizedClient(): Promise<OAuth2Client> {
+  private async getAuthorizedClient(): Promise<InstanceType<typeof google.auth.OAuth2>> {
     const oauthClient = this.createOAuthClient();
     const token = await this.prisma.googleAuthToken.findUnique({
       where: { provider: 'google' },
@@ -272,7 +271,7 @@ export class GoogleContactsService {
     return oauthClient;
   }
 
-  private async persistTokens(tokens: OAuth2Client['credentials']) {
+  private async persistTokens(tokens: InstanceType<typeof google.auth.OAuth2>['credentials']) {
     const existing = await this.prisma.googleAuthToken.findUnique({
       where: { provider: 'google' },
     });
