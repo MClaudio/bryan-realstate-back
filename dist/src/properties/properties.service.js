@@ -15,6 +15,7 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const client_1 = require("@prisma/client");
 const recommendation_queue_service_1 = require("./recommendation-queue.service");
 const property_recommendation_service_1 = require("./property-recommendation.service");
+const property_interests_service_1 = require("../property-interests/property-interests.service");
 const dmmfModels = client_1.Prisma.dmmf?.datamodel?.models ?? [];
 const propertyModelFields = new Set(dmmfModels.find((m) => m.name === 'Property')?.fields.map((f) => f.name) ?? []);
 const propertyInclude = {
@@ -56,10 +57,12 @@ let PropertiesService = class PropertiesService {
     prisma;
     recommendationQueueService;
     propertyRecommendationService;
-    constructor(prisma, recommendationQueueService, propertyRecommendationService) {
+    propertyInterestsService;
+    constructor(prisma, recommendationQueueService, propertyRecommendationService, propertyInterestsService) {
         this.prisma = prisma;
         this.recommendationQueueService = recommendationQueueService;
         this.propertyRecommendationService = propertyRecommendationService;
+        this.propertyInterestsService = propertyInterestsService;
     }
     async getCurrentSequence() {
         const currentSequence = await this.prisma.property.count();
@@ -185,13 +188,42 @@ let PropertiesService = class PropertiesService {
         }
         return property;
     }
-    async recommendForProperty(id) {
+    async recommendForProperty(id, options) {
+        const persist = options?.persist ?? true;
+        const enqueue = options?.enqueue ?? false;
+        const userId = options?.userId ?? '';
         const property = await this.findOne(id);
+        if (enqueue) {
+            const jobId = await this.recommendationQueueService.enqueueRecommendation({
+                propertyId: id,
+                userId,
+                trigger: 'manual',
+                property,
+            });
+            return {
+                propertyId: id,
+                recommendationQueued: true,
+                recommendationJobId: jobId,
+                recommendedCandidates: [],
+            };
+        }
         const recommendedCandidates = await this.propertyRecommendationService.recommendCandidates(property);
+        let reconcileResult = null;
+        if (persist) {
+            try {
+                reconcileResult = await this.propertyInterestsService.reconcileRecommendations(id, recommendedCandidates);
+            }
+            catch (error) {
+                reconcileResult = {
+                    error: error instanceof Error ? error.message : String(error),
+                };
+            }
+        }
         return {
             propertyId: id,
             recommendationQueued: false,
             recommendedCandidates,
+            reconcile: reconcileResult,
         };
     }
     async update(id, updatePropertyDto, userId) {
@@ -339,6 +371,7 @@ exports.PropertiesService = PropertiesService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         recommendation_queue_service_1.RecommendationQueueService,
-        property_recommendation_service_1.PropertyRecommendationService])
+        property_recommendation_service_1.PropertyRecommendationService,
+        property_interests_service_1.PropertyInterestsService])
 ], PropertiesService);
 //# sourceMappingURL=properties.service.js.map

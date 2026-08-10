@@ -15,6 +15,7 @@ import { BlacklistModule } from './blacklist/blacklist.module';
 import { GoogleContactsModule } from './google-contacts/google-contacts.module';
 import { SyncContactsModule } from './sync-contacts/sync-contacts.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { RecommendationSchedulerModule } from './recommendation-scheduler/recommendation-scheduler.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     GoogleContactsModule,
     SyncContactsModule,
     NotificationsModule,
+    RecommendationSchedulerModule,
   ],
   controllers: [],
   providers: [],

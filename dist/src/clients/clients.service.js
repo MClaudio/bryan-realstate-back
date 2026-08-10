@@ -48,6 +48,7 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const bcrypt = __importStar(require("bcrypt"));
 const sync_contacts_service_1 = require("../sync-contacts/sync-contacts.service");
 const phoneFormatter_1 = require("../utils/phoneFormatter");
+const contact_normalization_1 = require("../sync-contacts/utils/contact-normalization");
 let ClientsService = class ClientsService {
     prisma;
     syncContactsService;
@@ -77,9 +78,12 @@ let ClientsService = class ClientsService {
             const salt = await bcrypt.genSalt();
             passwordHash = await bcrypt.hash(password, salt);
         }
+        const { firstName, lastName } = (0, contact_normalization_1.normalizeNamePair)(clientData.firstName, clientData.lastName);
         const createdClient = await this.prisma.client.create({
             data: {
                 ...clientData,
+                firstName,
+                lastName,
                 phone: formattedPhone,
                 password: passwordHash,
             },
@@ -125,6 +129,11 @@ let ClientsService = class ClientsService {
             throw new common_1.NotFoundException(`Client with ID ${id} not found`);
         const { password, ...updateData } = updateClientDto;
         const data = { ...updateData };
+        if (updateData.firstName !== undefined || updateData.lastName !== undefined) {
+            const merged = (0, contact_normalization_1.normalizeNamePair)(updateData.firstName !== undefined ? updateData.firstName : client.firstName, updateData.lastName !== undefined ? updateData.lastName : client.lastName);
+            data.firstName = merged.firstName;
+            data.lastName = merged.lastName;
+        }
         if (updateData.phone) {
             if (!updateData.phone.trim()) {
                 throw new common_1.BadRequestException('El teléfono no puede estar vacío');

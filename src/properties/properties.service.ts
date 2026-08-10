@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PropertyStatus, FileType, Prisma } from '@prisma/client';
 import { RecommendationQueueService } from './recommendation-queue.service';
 import { PropertyRecommendationService } from './property-recommendation.service';
+import { PropertyInterestsService } from '../property-interests/property-interests.service';
 
 const dmmfModels: Array<{ name: string; fields: Array<{ name: string }> }> =
   (Prisma as any).dmmf?.datamodel?.models ?? [];
@@ -55,6 +56,7 @@ export class PropertiesService {
     private prisma: PrismaService,
     private readonly recommendationQueueService: RecommendationQueueService,
     private readonly propertyRecommendationService: PropertyRecommendationService,
+    private readonly propertyInterestsService: PropertyInterestsService,
   ) { }
 
   async getCurrentSequence() {
@@ -207,15 +209,50 @@ export class PropertiesService {
     return property;
   }
 
-  async recommendForProperty(id: string) {
+  async recommendForProperty(id: string, options?: { persist?: boolean; enqueue?: boolean; userId?: string }) {
+    const persist = options?.persist ?? true;
+    const enqueue = options?.enqueue ?? false;
+    const userId = options?.userId ?? '';
+
     const property = await this.findOne(id);
+
+    if (enqueue) {
+      const jobId = await this.recommendationQueueService.enqueueRecommendation({
+        propertyId: id,
+        userId,
+        trigger: 'manual',
+        property,
+      });
+      return {
+        propertyId: id,
+        recommendationQueued: true,
+        recommendationJobId: jobId,
+        recommendedCandidates: [],
+      };
+    }
+
     const recommendedCandidates =
       await this.propertyRecommendationService.recommendCandidates(property);
+
+    let reconcileResult: any = null;
+    if (persist) {
+      try {
+        reconcileResult = await this.propertyInterestsService.reconcileRecommendations(
+          id,
+          recommendedCandidates,
+        );
+      } catch (error) {
+        reconcileResult = {
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    }
 
     return {
       propertyId: id,
       recommendationQueued: false,
       recommendedCandidates,
+      reconcile: reconcileResult,
     };
   }
 

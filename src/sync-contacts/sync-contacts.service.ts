@@ -11,6 +11,7 @@ import {
     buildCandidateId,
     getContactUniqueKey,
     normalizeEmail,
+    normalizeNamePair,
     normalizePhone,
     splitFullName,
 } from './utils/contact-normalization';
@@ -249,8 +250,11 @@ export class SyncContactsService implements OnModuleInit {
                 continue;
             }
 
-            const firstName = googleContact.firstName?.trim() || splitFullName(googleContact.fullName).firstName;
-            const lastName = googleContact.lastName?.trim() || splitFullName(googleContact.fullName).lastName;
+            const { firstName, lastName } = normalizeNamePair(
+                googleContact.firstName,
+                googleContact.lastName,
+                googleContact.fullName,
+            );
             const fullName = googleContact.fullName?.trim() || `${firstName} ${lastName}`.trim();
 
             candidates.push({
@@ -361,9 +365,11 @@ export class SyncContactsService implements OnModuleInit {
                     },
                 });
 
-                const nameFromFull = splitFullName(selectedContact.fullName);
-                const firstName = selectedContact.firstName?.trim() || nameFromFull.firstName;
-                const lastName = selectedContact.lastName?.trim() || nameFromFull.lastName;
+                const { firstName, lastName } = normalizeNamePair(
+                    selectedContact.firstName,
+                    selectedContact.lastName,
+                    selectedContact.fullName,
+                );
                 const incomingBiography = selectedContact.biography?.trim() || null;
                 if (existingClient) {
                     await this.prisma.client.update({
@@ -384,9 +390,11 @@ export class SyncContactsService implements OnModuleInit {
                 continue;
             }
 
-            const nameFromFull = splitFullName(selectedContact.fullName);
-            const firstName = selectedContact.firstName?.trim() || nameFromFull.firstName;
-            const lastName = selectedContact.lastName?.trim() || nameFromFull.lastName;
+            const { firstName, lastName } = normalizeNamePair(
+                selectedContact.firstName,
+                selectedContact.lastName,
+                selectedContact.fullName,
+            );
 
             await this.prisma.client.create({
                 data: {

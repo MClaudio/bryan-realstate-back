@@ -24,6 +24,7 @@ const blacklist_module_1 = require("./blacklist/blacklist.module");
 const google_contacts_module_1 = require("./google-contacts/google-contacts.module");
 const sync_contacts_module_1 = require("./sync-contacts/sync-contacts.module");
 const notifications_module_1 = require("./notifications/notifications.module");
+const recommendation_scheduler_module_1 = require("./recommendation-scheduler/recommendation-scheduler.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -46,6 +47,7 @@ exports.AppModule = AppModule = __decorate([
             google_contacts_module_1.GoogleContactsModule,
             sync_contacts_module_1.SyncContactsModule,
             notifications_module_1.NotificationsModule,
+            recommendation_scheduler_module_1.RecommendationSchedulerModule,
         ],
         controllers: [],
         providers: [],
