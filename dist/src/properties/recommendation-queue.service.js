@@ -17,19 +17,22 @@ const client_1 = require("@prisma/client");
 const bullmq_1 = require("bullmq");
 const notifications_service_1 = require("../notifications/notifications.service");
 const property_recommendation_service_1 = require("./property-recommendation.service");
+const property_interests_service_1 = require("../property-interests/property-interests.service");
 const PROPERTY_RECOMMENDATION_QUEUE = 'property-recommendation';
 const PROPERTY_RECOMMENDATION_JOB = 'run';
 let RecommendationQueueService = RecommendationQueueService_1 = class RecommendationQueueService {
     configService;
     propertyRecommendationService;
     notificationsService;
+    propertyInterestsService;
     logger = new common_1.Logger(RecommendationQueueService_1.name);
     queue;
     worker;
-    constructor(configService, propertyRecommendationService, notificationsService) {
+    constructor(configService, propertyRecommendationService, notificationsService, propertyInterestsService) {
         this.configService = configService;
         this.propertyRecommendationService = propertyRecommendationService;
         this.notificationsService = notificationsService;
+        this.propertyInterestsService = propertyInterestsService;
     }
     onModuleInit() {
         const connection = this.getRedisConnection();
@@ -72,26 +75,45 @@ let RecommendationQueueService = RecommendationQueueService_1 = class Recommenda
         const { property, propertyId, trigger, userId } = job.data;
         const candidates = await this.propertyRecommendationService.recommendCandidates(property);
         const propertyCode = String(property?.code ?? propertyId);
+        let reconcileSummary = null;
+        try {
+            const reconcile = await this.propertyInterestsService.reconcileRecommendations(propertyId, candidates);
+            reconcileSummary = reconcile.summary ?? null;
+        }
+        catch (error) {
+            this.logger.error(`Error persisting interests for property ${propertyCode}: ${error instanceof Error ? error.message : String(error)}`);
+        }
         const hasCandidates = candidates.length > 0;
+        const appliedChanges = reconcileSummary &&
+            (reconcileSummary.created ||
+                reconcileSummary.updated ||
+                reconcileSummary.deleted);
+        const reconcileText = reconcileSummary
+            ? ` (${reconcileSummary.created ?? 0} nuevo(s), ${reconcileSummary.updated ?? 0} actualizado(s), ${reconcileSummary.deleted ?? 0} removido(s))`
+            : '';
+        const title = appliedChanges
+            ? 'Recomendación IA aplicada'
+            : hasCandidates
+                ? 'Recomendación IA finalizada'
+                : 'Recomendación IA finalizada';
+        const message = appliedChanges
+            ? `Se aplicaron automáticamente los interesados para la propiedad ${propertyCode}.${reconcileText}`
+            : hasCandidates
+                ? `Se encontraron ${candidates.length} cliente(s) para la propiedad ${propertyCode} y se actualizó la lista de interesados.`
+                : `No se encontraron clientes nuevos para la propiedad ${propertyCode}.${reconcileText}`;
         await this.notificationsService.createForUser({
             userId,
-            title: hasCandidates
-                ? 'Recomendación IA lista'
-                : 'Recomendación IA finalizada',
-            message: hasCandidates
-                ? `Se encontraron ${candidates.length} cliente(s) para la propiedad ${propertyCode}.`
-                : `No se encontraron clientes para la propiedad ${propertyCode}.`,
+            title,
+            message,
             path: `/admin/propiedades/ver/${propertyId}`,
-            actionType: hasCandidates
-                ? client_1.NotificationActionType.OPEN_MODAL
-                : client_1.NotificationActionType.NAVIGATE,
-            modalKey: hasCandidates ? 'property-interested-candidates' : undefined,
+            actionType: client_1.NotificationActionType.NAVIGATE,
             entityType: 'property',
             entityId: propertyId,
             payload: {
                 propertyId,
                 trigger,
                 candidates,
+                reconcile: reconcileSummary,
             },
         });
     }
@@ -114,6 +136,7 @@ exports.RecommendationQueueService = RecommendationQueueService = Recommendation
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [config_1.ConfigService,
         property_recommendation_service_1.PropertyRecommendationService,
-        notifications_service_1.NotificationsService])
+        notifications_service_1.NotificationsService,
+        property_interests_service_1.PropertyInterestsService])
 ], RecommendationQueueService);
 //# sourceMappingURL=recommendation-queue.service.js.map

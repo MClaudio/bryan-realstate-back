@@ -14,19 +14,24 @@ const prisma_module_1 = require("../prisma/prisma.module");
 const property_recommendation_service_1 = require("./property-recommendation.service");
 const recommendation_queue_service_1 = require("./recommendation-queue.service");
 const notifications_module_1 = require("../notifications/notifications.module");
+const property_interests_module_1 = require("../property-interests/property-interests.module");
 let PropertiesModule = class PropertiesModule {
 };
 exports.PropertiesModule = PropertiesModule;
 exports.PropertiesModule = PropertiesModule = __decorate([
     (0, common_1.Module)({
-        imports: [prisma_module_1.PrismaModule, notifications_module_1.NotificationsModule],
+        imports: [prisma_module_1.PrismaModule, notifications_module_1.NotificationsModule, property_interests_module_1.PropertyInterestsModule],
         controllers: [properties_controller_1.PropertiesController],
         providers: [
             properties_service_1.PropertiesService,
             property_recommendation_service_1.PropertyRecommendationService,
             recommendation_queue_service_1.RecommendationQueueService,
         ],
-        exports: [properties_service_1.PropertiesService],
+        exports: [
+            properties_service_1.PropertiesService,
+            property_recommendation_service_1.PropertyRecommendationService,
+            recommendation_queue_service_1.RecommendationQueueService,
+        ],
     })
 ], PropertiesModule);
 //# sourceMappingURL=properties.module.js.map

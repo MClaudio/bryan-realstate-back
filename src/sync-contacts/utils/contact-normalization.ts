@@ -36,6 +36,62 @@ export const splitFullName = (fullName?: string | null): { firstName: string; la
   };
 };
 
+const trimAndCollapseSpaces = (value: string): string =>
+  value.replace(/\s+/g, ' ').trim();
+
+export const normalizeNamePair = (
+  rawFirstName?: string | null,
+  rawLastName?: string | null,
+  rawFullName?: string | null,
+): { firstName: string; lastName: string } => {
+  const firstName = rawFirstName?.trim() ?? '';
+  const lastName = rawLastName?.trim() ?? '';
+  const fullName = rawFullName?.trim() ?? '';
+
+  if (!firstName && !lastName && !fullName) {
+    return { firstName: 'Sin', lastName: 'Nombre' };
+  }
+
+  let workingFirst = firstName;
+  let workingLast = lastName;
+
+  if (!workingFirst || !workingLast) {
+    const fromFull = splitFullName(fullName || `${workingFirst} ${workingLast}`);
+    workingFirst = fromFull.firstName;
+    workingLast = fromFull.lastName;
+  }
+
+  if (workingLast) {
+    const suffix = ` ${workingLast}`;
+    while (workingFirst.length > suffix.length && workingFirst.endsWith(suffix)) {
+      workingFirst = workingFirst.slice(0, -suffix.length).trimEnd();
+    }
+
+    const suffixNoSpace = workingLast;
+    if (
+      workingFirst.length > suffixNoSpace.length &&
+      workingFirst.endsWith(suffixNoSpace) &&
+      !workingFirst.endsWith(` ${suffixNoSpace}`)
+    ) {
+      const candidate = workingFirst.slice(0, -suffixNoSpace.length).trimEnd();
+      if (candidate.length > 0) {
+        workingFirst = candidate;
+      }
+    }
+  }
+
+  if (fullName && (!workingFirst || !workingLast || workingLast === 'N/A')) {
+    const reSplit = splitFullName(fullName);
+    if (!workingFirst) workingFirst = reSplit.firstName;
+    if (!workingLast || workingLast === 'N/A') workingLast = reSplit.lastName;
+  }
+
+  return {
+    firstName: trimAndCollapseSpaces(workingFirst || 'Sin'),
+    lastName: trimAndCollapseSpaces(workingLast || 'Nombre'),
+  };
+};
+
 export const getContactUniqueKey = (email?: string | null, phone?: string | null): string | null => {
   const normalizedEmail = normalizeEmail(email);
   const normalizedPhone = normalizePhone(phone);

@@ -31,8 +31,15 @@ let PropertiesController = class PropertiesController {
             throw new common_1.BadRequestException('url query param is required');
         return this.propertiesService.resolveMapsUrl(url);
     }
-    recommendForProperty(id) {
-        return this.propertiesService.recommendForProperty(id);
+    recommendForProperty(id, req, body) {
+        const enqueue = Boolean(body?.enqueue);
+        const persist = body?.persist === false ? false : true;
+        const userId = this.getUserId(req);
+        return this.propertiesService.recommendForProperty(id, {
+            enqueue,
+            persist,
+            userId,
+        });
     }
     create(createPropertyDto, req) {
         return this.propertiesService.create(createPropertyDto, this.getUserId(req));
@@ -77,8 +84,10 @@ __decorate([
     (0, common_1.Post)(':id/recommendations'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
+    __param(2, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, Object, Object]),
     __metadata("design:returntype", void 0)
 ], PropertiesController.prototype, "recommendForProperty", null);
 __decorate([

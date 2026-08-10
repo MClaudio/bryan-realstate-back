@@ -12,6 +12,7 @@ import {
 import { PropertyInterestsService } from './property-interests.service';
 import { CreatePropertyInterestDto } from './dto/create-property-interest.dto';
 import { UpdatePropertyInterestDto } from './dto/update-property-interest.dto';
+import { ReconcileRecommendationsDto } from './dto/reconcile-recommendations.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('property-interests')
@@ -22,6 +23,14 @@ export class PropertyInterestsController {
   @Post()
   create(@Body() dto: CreatePropertyInterestDto) {
     return this.service.create(dto);
+  }
+
+  @Post('properties/:propertyId/reconcile')
+  reconcileRecommendations(
+    @Param('propertyId') propertyId: string,
+    @Body() dto: ReconcileRecommendationsDto,
+  ) {
+    return this.service.reconcileRecommendations(propertyId, dto.recommendations);
   }
 
   @Get()

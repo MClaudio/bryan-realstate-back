@@ -19,6 +19,7 @@ exports.PropertyInterestsModule = PropertyInterestsModule = __decorate([
         imports: [prisma_module_1.PrismaModule],
         controllers: [property_interests_controller_1.PropertyInterestsController],
         providers: [property_interests_service_1.PropertyInterestsService],
+        exports: [property_interests_service_1.PropertyInterestsService],
     })
 ], PropertyInterestsModule);
 //# sourceMappingURL=property-interests.module.js.map

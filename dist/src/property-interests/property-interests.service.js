@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PropertyInterestsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
+const client_1 = require("@prisma/client");
 const interestInclude = {
     client: {
         select: {
@@ -26,6 +27,30 @@ const interestInclude = {
         select: { id: true, code: true, address: true },
     },
 };
+const INTEREST_LEVEL_RANK = {
+    [client_1.InterestLevel.MuyAlto]: 4,
+    [client_1.InterestLevel.Alto]: 3,
+    [client_1.InterestLevel.Medio]: 2,
+    [client_1.InterestLevel.Bajo]: 1,
+};
+function toPrismaInterestLevel(raw) {
+    const value = typeof raw === 'string' ? raw.toUpperCase() : '';
+    switch (value) {
+        case 'MUY_ALTO':
+        case 'MUYALTO':
+        case 'MUY ALTO':
+            return client_1.InterestLevel.MuyAlto;
+        case 'ALTO':
+            return client_1.InterestLevel.Alto;
+        case 'BAJO':
+            return client_1.InterestLevel.Bajo;
+        case 'MEDIO':
+        case 'MEDIUM':
+            return client_1.InterestLevel.Medio;
+        default:
+            return undefined;
+    }
+}
 let PropertyInterestsService = class PropertyInterestsService {
     prisma;
     constructor(prisma) {
@@ -44,10 +69,15 @@ let PropertyInterestsService = class PropertyInterestsService {
         });
     }
     async findAllByProperty(propertyId) {
-        return this.prisma.propertyInterest.findMany({
+        const records = await this.prisma.propertyInterest.findMany({
             where: { propertyId },
-            orderBy: { interestDate: 'desc' },
             include: interestInclude,
+        });
+        return records.sort((a, b) => {
+            const rank = INTEREST_LEVEL_RANK[b.interestLevel] - INTEREST_LEVEL_RANK[a.interestLevel];
+            if (rank !== 0)
+                return rank;
+            return b.interestDate.getTime() - a.interestDate.getTime();
         });
     }
     async findAllByClient(clientId) {
@@ -83,6 +113,94 @@ let PropertyInterestsService = class PropertyInterestsService {
     async remove(id) {
         await this.findOne(id);
         return this.prisma.propertyInterest.delete({ where: { id } });
+    }
+    async reconcileRecommendations(propertyId, recommendations) {
+        const property = await this.prisma.property.findUnique({
+            where: { id: propertyId },
+            select: { id: true, code: true },
+        });
+        if (!property) {
+            throw new common_1.NotFoundException('Propiedad no encontrada');
+        }
+        const today = new Date();
+        const normalizedMap = new Map();
+        for (const item of recommendations || []) {
+            const clientId = String(item.clientId ?? item.client_id ?? '').trim();
+            if (!clientId)
+                continue;
+            const level = toPrismaInterestLevel(item.interestLevel ?? item.interest_level) ?? client_1.InterestLevel.Medio;
+            const notes = typeof item.notes === 'string' && item.notes.trim().length > 0
+                ? item.notes.trim()
+                : typeof item.reason === 'string' && item.reason.trim().length > 0
+                    ? item.reason.trim()
+                    : undefined;
+            const interestDate = typeof item.interestDate === 'string' && item.interestDate.length > 0
+                ? new Date(item.interestDate)
+                : today;
+            const prev = normalizedMap.get(clientId);
+            if (!prev || INTEREST_LEVEL_RANK[level] > INTEREST_LEVEL_RANK[prev.level]) {
+                normalizedMap.set(clientId, { level, notes, interestDate });
+            }
+        }
+        const existing = await this.prisma.propertyInterest.findMany({
+            where: { propertyId },
+            select: { id: true, clientId: true, interestLevel: true, interestDate: true, notes: true },
+        });
+        const existingByClient = new Map(existing.map((e) => [e.clientId, e]));
+        const toCreate = [];
+        const toUpdate = [];
+        const toDelete = [];
+        await this.prisma.$transaction(async (tx) => {
+            for (const [clientId, incoming] of normalizedMap) {
+                const curr = existingByClient.get(clientId);
+                if (!curr) {
+                    await tx.propertyInterest.create({
+                        data: {
+                            property: { connect: { id: propertyId } },
+                            client: { connect: { id: clientId } },
+                            interestLevel: incoming.level,
+                            interestDate: incoming.interestDate,
+                            notes: incoming.notes,
+                        },
+                        select: { id: true },
+                    });
+                    toCreate.push(clientId);
+                }
+                else {
+                    const levelChanged = curr.interestLevel !== incoming.level;
+                    const notesChanged = (curr.notes ?? '') !== (incoming.notes ?? '') && incoming.notes !== undefined;
+                    if (levelChanged || notesChanged) {
+                        await tx.propertyInterest.update({
+                            where: { id: curr.id },
+                            data: {
+                                interestLevel: incoming.level,
+                                ...(incoming.notes !== undefined && { notes: incoming.notes }),
+                            },
+                            select: { id: true },
+                        });
+                    }
+                    toUpdate.push(clientId);
+                }
+            }
+            const wantedIds = new Set(normalizedMap.keys());
+            for (const curr of existing) {
+                if (!wantedIds.has(curr.clientId)) {
+                    await tx.propertyInterest.delete({ where: { id: curr.id } });
+                    toDelete.push(curr.clientId);
+                }
+            }
+        });
+        return {
+            propertyId,
+            summary: {
+                totalIncoming: normalizedMap.size,
+                created: toCreate.length,
+                updated: toUpdate.length,
+                deleted: toDelete.length,
+            },
+            clientChanges: { created: toCreate, updated: toUpdate, deleted: toDelete },
+            interests: await this.findAllByProperty(propertyId),
+        };
     }
 };
 exports.PropertyInterestsService = PropertyInterestsService;

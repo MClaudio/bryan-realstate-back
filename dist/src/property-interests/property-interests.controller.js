@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const property_interests_service_1 = require("./property-interests.service");
 const create_property_interest_dto_1 = require("./dto/create-property-interest.dto");
 const update_property_interest_dto_1 = require("./dto/update-property-interest.dto");
+const reconcile_recommendations_dto_1 = require("./dto/reconcile-recommendations.dto");
 const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
 let PropertyInterestsController = class PropertyInterestsController {
     service;
@@ -25,6 +26,9 @@ let PropertyInterestsController = class PropertyInterestsController {
     }
     create(dto) {
         return this.service.create(dto);
+    }
+    reconcileRecommendations(propertyId, dto) {
+        return this.service.reconcileRecommendations(propertyId, dto.recommendations);
     }
     findAll(propertyId, clientId) {
         if (propertyId)
@@ -51,6 +55,14 @@ __decorate([
     __metadata("design:paramtypes", [create_property_interest_dto_1.CreatePropertyInterestDto]),
     __metadata("design:returntype", void 0)
 ], PropertyInterestsController.prototype, "create", null);
+__decorate([
+    (0, common_1.Post)('properties/:propertyId/reconcile'),
+    __param(0, (0, common_1.Param)('propertyId')),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, reconcile_recommendations_dto_1.ReconcileRecommendationsDto]),
+    __metadata("design:returntype", void 0)
+], PropertyInterestsController.prototype, "reconcileRecommendations", null);
 __decorate([
     (0, common_1.Get)(),
     __param(0, (0, common_1.Query)('propertyId')),

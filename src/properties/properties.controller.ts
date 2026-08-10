@@ -22,8 +22,19 @@ export class PropertiesController {
 
   @Post(':id/recommendations')
   @UseGuards(JwtAuthGuard)
-  recommendForProperty(@Param('id') id: string) {
-    return this.propertiesService.recommendForProperty(id);
+  recommendForProperty(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body() body?: { enqueue?: boolean; persist?: boolean },
+  ) {
+    const enqueue = Boolean(body?.enqueue);
+    const persist = body?.persist === false ? false : true;
+    const userId = this.getUserId(req);
+    return this.propertiesService.recommendForProperty(id, {
+      enqueue,
+      persist,
+      userId,
+    });
   }
 
   @Post()

@@ -7,6 +7,7 @@ export declare class ClientsService {
     private syncContactsService;
     constructor(prisma: PrismaService, syncContactsService: SyncContactsService);
     create(createClientDto: CreateClientDto): Promise<{
+        id: string;
         firstName: string;
         lastName: string;
         email: string | null;
@@ -14,24 +15,24 @@ export declare class ClientsService {
         phone: string;
         address: string | null;
         ruc: string | null;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
         birthDate: Date | null;
-        userId: string | null;
+        googleContactId: string | null;
+        googleSyncedAt: Date | null;
         lastLogin: boolean;
         notes: string | null;
         interestDescription: string | null;
-        googleContactId: string | null;
-        googleSyncedAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string | null;
     }>;
     findAll(): Promise<({
         user: {
+            id: string;
             firstName: string;
             lastName: string;
-            id: string;
         } | null;
     } & {
+        id: string;
         firstName: string;
         lastName: string;
         email: string | null;
@@ -39,24 +40,24 @@ export declare class ClientsService {
         phone: string;
         address: string | null;
         ruc: string | null;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
         birthDate: Date | null;
-        userId: string | null;
+        googleContactId: string | null;
+        googleSyncedAt: Date | null;
         lastLogin: boolean;
         notes: string | null;
         interestDescription: string | null;
-        googleContactId: string | null;
-        googleSyncedAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string | null;
     })[]>;
     findOne(id: string): Promise<{
         user: {
+            id: string;
             firstName: string;
             lastName: string;
-            id: string;
         } | null;
     } & {
+        id: string;
         firstName: string;
         lastName: string;
         email: string | null;
@@ -64,18 +65,18 @@ export declare class ClientsService {
         phone: string;
         address: string | null;
         ruc: string | null;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
         birthDate: Date | null;
-        userId: string | null;
+        googleContactId: string | null;
+        googleSyncedAt: Date | null;
         lastLogin: boolean;
         notes: string | null;
         interestDescription: string | null;
-        googleContactId: string | null;
-        googleSyncedAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string | null;
     }>;
     update(id: string, updateClientDto: UpdateClientDto): Promise<{
+        id: string;
         firstName: string;
         lastName: string;
         email: string | null;
@@ -83,18 +84,18 @@ export declare class ClientsService {
         phone: string;
         address: string | null;
         ruc: string | null;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
         birthDate: Date | null;
-        userId: string | null;
+        googleContactId: string | null;
+        googleSyncedAt: Date | null;
         lastLogin: boolean;
         notes: string | null;
         interestDescription: string | null;
-        googleContactId: string | null;
-        googleSyncedAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string | null;
     }>;
     remove(id: string): Promise<{
+        id: string;
         firstName: string;
         lastName: string;
         email: string | null;
@@ -102,15 +103,14 @@ export declare class ClientsService {
         phone: string;
         address: string | null;
         ruc: string | null;
-        id: string;
-        createdAt: Date;
-        updatedAt: Date;
         birthDate: Date | null;
-        userId: string | null;
+        googleContactId: string | null;
+        googleSyncedAt: Date | null;
         lastLogin: boolean;
         notes: string | null;
         interestDescription: string | null;
-        googleContactId: string | null;
-        googleSyncedAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+        userId: string | null;
     }>;
 }

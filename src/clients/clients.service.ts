@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { SyncContactsService } from '../sync-contacts/sync-contacts.service';
 import { formatPhoneNumber, validatePhoneNumber } from '../utils/phoneFormatter';
+import { normalizeNamePair } from '../sync-contacts/utils/contact-normalization';
 
 @Injectable()
 export class ClientsService {
@@ -44,9 +45,16 @@ export class ClientsService {
       passwordHash = await bcrypt.hash(password, salt);
     }
 
+    const { firstName, lastName } = normalizeNamePair(
+      clientData.firstName,
+      clientData.lastName,
+    );
+
     const createdClient = await this.prisma.client.create({
       data: {
         ...clientData,
+        firstName,
+        lastName,
         phone: formattedPhone,
         password: passwordHash,
       },
@@ -99,6 +107,15 @@ export class ClientsService {
 
     const { password, ...updateData } = updateClientDto;
     const data: any = { ...updateData };
+
+    if (updateData.firstName !== undefined || updateData.lastName !== undefined) {
+      const merged = normalizeNamePair(
+        updateData.firstName !== undefined ? updateData.firstName : client.firstName,
+        updateData.lastName !== undefined ? updateData.lastName : client.lastName,
+      );
+      data.firstName = merged.firstName;
+      data.lastName = merged.lastName;
+    }
 
     // Validar y formatear teléfono si se proporciona
     if (updateData.phone) {
