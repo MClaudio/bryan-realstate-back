@@ -12,129 +12,129 @@ export declare class PropertyInterestsService {
     private prisma;
     constructor(prisma: PrismaService);
     create(dto: CreatePropertyInterestDto): Promise<{
-        property: {
-            id: string;
-            code: string;
-            address: string;
-        };
         client: {
-            id: string;
             firstName: string;
             lastName: string;
             email: string | null;
             phone: string;
+            id: string;
+        };
+        property: {
+            address: string;
+            id: string;
+            code: string;
         };
     } & {
         id: string;
-        interestDate: Date;
-        interestLevel: import("@prisma/client").$Enums.InterestLevel;
-        notes: string | null;
         createdAt: Date;
         updatedAt: Date;
-        propertyId: string;
+        notes: string | null;
         clientId: string;
+        propertyId: string;
+        interestDate: Date;
+        interestLevel: import("@prisma/client").$Enums.InterestLevel;
     }>;
     findAllByProperty(propertyId: string): Promise<({
-        property: {
-            id: string;
-            code: string;
-            address: string;
-        };
         client: {
-            id: string;
             firstName: string;
             lastName: string;
             email: string | null;
             phone: string;
+            id: string;
+        };
+        property: {
+            address: string;
+            id: string;
+            code: string;
         };
     } & {
         id: string;
-        interestDate: Date;
-        interestLevel: import("@prisma/client").$Enums.InterestLevel;
-        notes: string | null;
         createdAt: Date;
         updatedAt: Date;
-        propertyId: string;
+        notes: string | null;
         clientId: string;
+        propertyId: string;
+        interestDate: Date;
+        interestLevel: import("@prisma/client").$Enums.InterestLevel;
     })[]>;
     findAllByClient(clientId: string): Promise<({
-        property: {
-            id: string;
-            code: string;
-            address: string;
-        };
         client: {
-            id: string;
             firstName: string;
             lastName: string;
             email: string | null;
             phone: string;
+            id: string;
+        };
+        property: {
+            address: string;
+            id: string;
+            code: string;
         };
     } & {
         id: string;
-        interestDate: Date;
-        interestLevel: import("@prisma/client").$Enums.InterestLevel;
-        notes: string | null;
         createdAt: Date;
         updatedAt: Date;
-        propertyId: string;
+        notes: string | null;
         clientId: string;
+        propertyId: string;
+        interestDate: Date;
+        interestLevel: import("@prisma/client").$Enums.InterestLevel;
     })[]>;
     findOne(id: string): Promise<{
-        property: {
-            id: string;
-            code: string;
-            address: string;
-        };
         client: {
-            id: string;
             firstName: string;
             lastName: string;
             email: string | null;
             phone: string;
+            id: string;
+        };
+        property: {
+            address: string;
+            id: string;
+            code: string;
         };
     } & {
         id: string;
-        interestDate: Date;
-        interestLevel: import("@prisma/client").$Enums.InterestLevel;
-        notes: string | null;
         createdAt: Date;
         updatedAt: Date;
-        propertyId: string;
+        notes: string | null;
         clientId: string;
+        propertyId: string;
+        interestDate: Date;
+        interestLevel: import("@prisma/client").$Enums.InterestLevel;
     }>;
     update(id: string, dto: UpdatePropertyInterestDto): Promise<{
-        property: {
-            id: string;
-            code: string;
-            address: string;
-        };
         client: {
-            id: string;
             firstName: string;
             lastName: string;
             email: string | null;
             phone: string;
+            id: string;
+        };
+        property: {
+            address: string;
+            id: string;
+            code: string;
         };
     } & {
         id: string;
-        interestDate: Date;
-        interestLevel: import("@prisma/client").$Enums.InterestLevel;
-        notes: string | null;
         createdAt: Date;
         updatedAt: Date;
-        propertyId: string;
+        notes: string | null;
         clientId: string;
+        propertyId: string;
+        interestDate: Date;
+        interestLevel: import("@prisma/client").$Enums.InterestLevel;
     }>;
     remove(id: string): Promise<{
         id: string;
-        interestDate: Date;
-        interestLevel: import("@prisma/client").$Enums.InterestLevel;
-        notes: string | null;
         createdAt: Date;
         updatedAt: Date;
-        propertyId: string;
+        notes: string | null;
         clientId: string;
+        propertyId: string;
+        interestDate: Date;
+        interestLevel: import("@prisma/client").$Enums.InterestLevel;
     }>;
     reconcileRecommendations(propertyId: string, recommendations: Array<{
         client_id?: string;
@@ -158,27 +158,27 @@ export declare class PropertyInterestsService {
             deleted: string[];
         };
         interests: ({
-            property: {
-                id: string;
-                code: string;
-                address: string;
-            };
             client: {
-                id: string;
                 firstName: string;
                 lastName: string;
                 email: string | null;
                 phone: string;
+                id: string;
+            };
+            property: {
+                address: string;
+                id: string;
+                code: string;
             };
         } & {
             id: string;
-            interestDate: Date;
-            interestLevel: import("@prisma/client").$Enums.InterestLevel;
-            notes: string | null;
             createdAt: Date;
             updatedAt: Date;
-            propertyId: string;
+            notes: string | null;
             clientId: string;
+            propertyId: string;
+            interestDate: Date;
+            interestLevel: import("@prisma/client").$Enums.InterestLevel;
         })[];
     }>;
 }
