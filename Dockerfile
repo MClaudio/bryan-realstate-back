@@ -1,28 +1,34 @@
-FROM node:20-alpine
+# syntax=docker/dockerfile:1
+# ---- Etapa 1: build (compila TS y genera el cliente de Prisma) ----
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copia manifiestos y archivos de configuración necesarios para el build
-COPY package.json ./
-COPY tsconfig.json ./
-COPY tsconfig.build.json ./
-COPY nest-cli.json ./
-COPY prisma.config.ts ./
+COPY package.json package-lock.json* ./
+COPY tsconfig.json tsconfig.build.json nest-cli.json prisma.config.ts ./
 COPY prisma ./prisma/
 
-# Instala todas las dependencias (devDeps necesarias para nest build y prisma CLI)
-RUN npm install
+RUN npm ci
 
-# Genera el cliente Prisma (no necesita conexión real a DB)
 RUN DATABASE_URL="postgresql://x:x@localhost:5432/x" npx prisma generate
 
-# Copia el código fuente y compila dentro del contenedor
-# ARG CACHEBUST invalida el cache de Docker desde este punto en cada deploy
-ARG CACHEBUST=2
 COPY src ./src/
-RUN npm run build && echo "=== Build OK ===" && ls -la dist/
+RUN npm run build
+
+# Deja solo las dependencias de producción (con el cliente Prisma ya generado)
+RUN npm prune --omit=dev
+
+# ---- Etapa 2: runtime (imagen final, liviana, sin devDependencies) ----
+FROM node:20-alpine AS runtime
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
+COPY package.json ./
 
 EXPOSE 3000
 
-# Al arrancar: aplica migraciones pendientes y luego inicia la app
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]

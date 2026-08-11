@@ -1,9 +1,9 @@
-name: Build and Deploy Backend to EasyPanel
+name: Build and Push Backend (test branch)
 
 on:
   push:
     branches:
-      - main
+      - test
 
 env:
   REGISTRY: ghcr.io
@@ -38,15 +38,21 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Trigger EasyPanel deployment
+      - name: Trigger EasyPanel test deployment (optional)
+        env:
+          TEST_WEBHOOK: ${{ secrets.EASYPANEL_DEPLOY_BACKEND_TEST_WEBHOOK }}
         run: |
-          echo "Triggering EasyPanel backend deployment (pull image only, no build)..."
-          response=$(curl -s -w "%{http_code}" -X POST "${{ secrets.EASYPANEL_DEPLOY_BACKEND_WEBHOOK }}")
+          if [ -z "$TEST_WEBHOOK" ]; then
+            echo "EASYPANEL_DEPLOY_BACKEND_TEST_WEBHOOK no está configurado, se omite este paso."
+            exit 0
+          fi
+          echo "Triggering EasyPanel TEST backend deployment (pull image only, no build)..."
+          response=$(curl -s -w "%{http_code}" -X POST "$TEST_WEBHOOK")
           http_code="${response: -3}"
           if [ "$http_code" = "200" ] || [ "$http_code" = "201" ] || [ "$http_code" = "204" ]; then
             echo "Deployment webhook triggered successfully (HTTP $http_code)"
@@ -58,9 +64,15 @@ jobs:
 
       - name: Deployment summary
         run: |
-          echo "Deployment Summary:"
-          echo "Image:   ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          echo "Test image built and pushed:"
+          echo "  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test"
+          echo "  ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test-${{ github.sha }}"
           echo "Branch:  ${{ github.ref_name }}"
           echo "Commit:  ${{ github.sha }}"
           echo "Author:  ${{ github.actor }}"
           echo "Time:    $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          echo ""
+          echo "Este workflow NO toca el servicio de producción (main)."
+          echo "Para probar en EasyPanel: crea un servicio aparte (p.ej. 'bryan-backend-test')"
+          echo "con Source = Docker Image apuntando a la tag :test, o configura el secret"
+          echo "EASYPANEL_DEPLOY_BACKEND_TEST_WEBHOOK si ya tienes ese servicio con webhook."
