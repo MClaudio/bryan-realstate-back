@@ -42,10 +42,15 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Trigger EasyPanel test deployment (optional)
-        if: ${{ vars.EASYPANEL_DEPLOY_BACKEND_TEST_WEBHOOK != '' || secrets.EASYPANEL_DEPLOY_BACKEND_TEST_WEBHOOK != '' }}
+        env:
+          TEST_WEBHOOK: ${{ secrets.EASYPANEL_DEPLOY_BACKEND_TEST_WEBHOOK }}
         run: |
+          if [ -z "$TEST_WEBHOOK" ]; then
+            echo "EASYPANEL_DEPLOY_BACKEND_TEST_WEBHOOK no está configurado, se omite este paso."
+            exit 0
+          fi
           echo "Triggering EasyPanel TEST backend deployment (pull image only, no build)..."
-          response=$(curl -s -w "%{http_code}" -X POST "${{ secrets.EASYPANEL_DEPLOY_BACKEND_TEST_WEBHOOK }}")
+          response=$(curl -s -w "%{http_code}" -X POST "$TEST_WEBHOOK")
           http_code="${response: -3}"
           if [ "$http_code" = "200" ] || [ "$http_code" = "201" ] || [ "$http_code" = "204" ]; then
             echo "Deployment webhook triggered successfully (HTTP $http_code)"
