@@ -6,6 +6,7 @@ import { PropertyStatus, FileType, Prisma } from '@prisma/client';
 import { RecommendationQueueService } from './recommendation-queue.service';
 import { PropertyRecommendationService } from './property-recommendation.service';
 import { PropertyInterestsService } from '../property-interests/property-interests.service';
+import { FilesService } from '../files/files.service';
 
 const dmmfModels: Array<{ name: string; fields: Array<{ name: string }> }> =
   (Prisma as any).dmmf?.datamodel?.models ?? [];
@@ -57,7 +58,37 @@ export class PropertiesService {
     private readonly recommendationQueueService: RecommendationQueueService,
     private readonly propertyRecommendationService: PropertyRecommendationService,
     private readonly propertyInterestsService: PropertyInterestsService,
+    private readonly filesService: FilesService,
   ) { }
+
+  private async enrichPropertiesFiles(properties: any[]): Promise<any[]> {
+    if (!Array.isArray(properties) || properties.length === 0) return properties;
+    const out: any[] = [];
+    for (const prop of properties) {
+      if (!prop) { out.push(prop); continue; }
+      const files = prop.files;
+      if (Array.isArray(files) && files.length > 0) {
+        const enrichedFiles: any[] = [];
+        for (const pf of files) {
+          if (pf && pf.file) {
+            const ef = await this.filesService.enrichFile(pf.file);
+            enrichedFiles.push({ ...pf, file: ef });
+          } else {
+            enrichedFiles.push(pf);
+          }
+        }
+        out.push({ ...prop, files: enrichedFiles });
+      } else {
+        out.push(prop);
+      }
+    }
+    return out;
+  }
+
+  private async enrichPropertyFiles(prop: any): Promise<any> {
+    const [enriched] = await this.enrichPropertiesFiles([prop]);
+    return enriched;
+  }
 
   async getCurrentSequence() {
     const currentSequence = await this.prisma.property.count();
@@ -156,8 +187,9 @@ export class PropertiesService {
       recommendationQueued = true;
     }
 
+    const enriched = await this.enrichPropertyFiles(property);
     return {
-      ...property,
+      ...enriched,
       recommendationQueued,
       recommendationJobId,
       recommendedCandidates: [],
@@ -165,14 +197,15 @@ export class PropertiesService {
   }
 
   async findAll() {
-    return this.prisma.property.findMany({
+    const raw = await this.prisma.property.findMany({
       include: propertyInclude,
       orderBy: { createdAt: 'desc' },
     });
+    return this.enrichPropertiesFiles(raw);
   }
 
   async findFeatured() {
-    return this.prisma.property.findMany({
+    const raw = await this.prisma.property.findMany({
       where: {
         isPublic: true,
         isFeatured: true
@@ -181,6 +214,7 @@ export class PropertiesService {
       orderBy: { createdAt: 'desc' },
       take: 6
     });
+    return this.enrichPropertiesFiles(raw);
   }
 
   async findOnePublic(id: string) {
@@ -193,7 +227,7 @@ export class PropertiesService {
       throw new NotFoundException(`Property with ID ${id} not found or not public`);
     }
 
-    return property;
+    return this.enrichPropertyFiles(property);
   }
 
   async findOne(id: string) {
@@ -206,7 +240,7 @@ export class PropertiesService {
       throw new NotFoundException(`Property with ID ${id} not found`);
     }
 
-    return property;
+    return this.enrichPropertyFiles(property);
   }
 
   async recommendForProperty(id: string, options?: { persist?: boolean; enqueue?: boolean; userId?: string }) {
@@ -348,8 +382,9 @@ export class PropertiesService {
       recommendationQueued = true;
     }
 
+    const enriched = await this.enrichPropertyFiles(updatedProperty);
     return {
-      ...updatedProperty,
+      ...enriched,
       recommendationQueued,
       recommendationJobId,
       recommendedCandidates: [],

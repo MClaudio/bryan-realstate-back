@@ -6,9 +6,10 @@ import { PropertyRecommendationService } from './property-recommendation.service
 import { RecommendationQueueService } from './recommendation-queue.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PropertyInterestsModule } from '../property-interests/property-interests.module';
+import { FilesModule } from '../files/files.module';
 
 @Module({
-  imports: [PrismaModule, NotificationsModule, PropertyInterestsModule],
+  imports: [PrismaModule, NotificationsModule, PropertyInterestsModule, FilesModule],
   controllers: [PropertiesController],
   providers: [
     PropertiesService,
