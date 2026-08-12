@@ -122,11 +122,11 @@ export class FilesService {
           ? fs.createReadStream(file.path)
           : (Buffer.isBuffer(file.buffer) ? file.buffer : file.buffer as any);
         const upload = new Upload({
-          client: this.s3Client,
+          client: this.s3Client as any,
           params: {
             Bucket: this.bucketName,
             Key: key,
-            Body: bodyStream,
+            Body: bodyStream as any,
             ContentType: file.mimetype,
             CacheControl: file.mimetype.startsWith('image/') ? 'public, max-age=31536000, immutable' : undefined,
           },
@@ -279,7 +279,7 @@ export class FilesService {
         Key: key,
       });
       const expiresInSec = 60 * 10;
-      const url = await getSignedUrl(this.s3Client, command, { expiresIn: expiresInSec });
+      const url = await getSignedUrl(this.s3Client as any, command, { expiresIn: expiresInSec });
       this.logger.debug(`Signed URL for ${id} expires in ${expiresInSec}s`);
       return { url, size: file.size, originalName: file.originalName };
     }
@@ -303,7 +303,7 @@ export class FilesService {
       }
       try {
         const command = new GetObjectCommand({ Bucket: this.bucketName, Key: key });
-        const signed = await getSignedUrl(this.s3Client, command, { expiresIn: 600 });
+        const signed = await getSignedUrl(this.s3Client as any, command, { expiresIn: 600 });
         return { url: signed };
       } catch (e: any) {
         this.logger.warn(`getPublicUrl S3 falló para ${file.id}: ${e?.message || String(e)}`);
