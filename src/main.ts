@@ -42,9 +42,19 @@ async function bootstrap() {
 
   // Explicit, generous body-parser limits so reverse proxies + large uploads
   // don't get silently truncated. The real per-file cap lives in the
+  // IMPORTANT: only parse JSON & urlencoded bodies when the content-type matches.
+  // Never let body-parser consume multipart/form-data (needed by Multer FileInterceptor).
   // FileInterceptor (MAX_UPLOAD_MB).
-  app.use(json({ limit: DEFAULT_BODY_LIMIT }));
-  app.use(urlencoded({ extended: true, limit: DEFAULT_BODY_LIMIT }));
+  const onlyJson = (req: any) => {
+    const ct = String(req.headers?.['content-type'] || '').toLowerCase();
+    return ct.includes('application/json');
+  };
+  const onlyUrlencoded = (req: any) => {
+    const ct = String(req.headers?.['content-type'] || '').toLowerCase();
+    return ct.includes('application/x-www-form-urlencoded');
+  };
+  app.use(json({ limit: DEFAULT_BODY_LIMIT, type: onlyJson }));
+  app.use(urlencoded({ extended: true, limit: DEFAULT_BODY_LIMIT, type: onlyUrlencoded }));
 
   app.setGlobalPrefix('api', {
     exclude: [

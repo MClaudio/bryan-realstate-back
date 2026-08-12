@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { PrismaService } from '../prisma/prisma.service';
@@ -99,44 +100,75 @@ export class FilesService {
     const key = `uploads/${fileName}`;
 
     this.logger.log(
-      `UPLOAD START: name=${file.originalname} | type=${file.mimetype} | size=${file.size}B (~${sizeMb.toFixed(2)}MB) | key=${key}`,
+      `UPLOAD START: name=${file.originalname} | type=${file.mimetype} | size=${file.size}B (~${sizeMb.toFixed(2)}MB) | key=${key} hasPath=${!!file.path}`,
     );
 
     if (sizeMb > this.maxUploadMb) {
-      const msg = `El archivo pesa ${sizeMb.toFixed(2)}MB y el l├¡mite es ${this.maxUploadMb}MB`;
+      const msg = `El archivo pesa ${sizeMb.toFixed(2)}MB y el límite es ${this.maxUploadMb}MB`;
       this.logger.warn(`UPLOAD REJECTED (oversized): ${msg}`);
+      this.cleanupTemp(file);
       throw new BadRequestException(msg);
     }
 
     const startedAt = Date.now();
+    let s3Abort: (() => void) | null = null;
     try {
       let publicPath: string;
       if (this.useS3) {
-        this.logger.log(`UPLOAD S3: sending PutObjectCommand to s3://${this.bucketName}/${key} ...`);
-        await this.s3Client.send(
-          new PutObjectCommand({
+        this.logger.log(`UPLOAD S3 (multipart Upload): sending to s3://${this.bucketName}/${key} ...`);
+        const s3t0 = Date.now();
+        let lastProgress = s3t0;
+        const bodyStream: NodeJS.ReadableStream = file.path
+          ? fs.createReadStream(file.path)
+          : (Buffer.isBuffer(file.buffer) ? file.buffer : file.buffer as any);
+        const upload = new Upload({
+          client: this.s3Client,
+          params: {
             Bucket: this.bucketName,
             Key: key,
-            Body: file.buffer,
+            Body: bodyStream,
             ContentType: file.mimetype,
-            ContentLength: file.size,
             CacheControl: file.mimetype.startsWith('image/') ? 'public, max-age=31536000, immutable' : undefined,
-          }),
-        );
+          },
+          partSize: 5 * 1024 * 1024,
+          queueSize: 2,
+          leavePartsOnError: false,
+          tags: [],
+        });
+        upload.on('httpUploadProgress', (progress: any) => {
+          const now = Date.now();
+          const loaded = progress.loaded ?? 0;
+          const total = progress.total ?? file.size;
+          const pct = total > 0 ? ((loaded / total) * 100).toFixed(1) : '?';
+          if (now - lastProgress > 2000 || loaded === total) {
+            this.logger.log(
+              `[s3-upload-progress] key=${key} ${loaded}B/${total}B (${pct}%) dt=${now - lastProgress}ms`,
+            );
+            lastProgress = now;
+          }
+        });
+        await upload.done();
+        const s3Only = ((Date.now() - s3t0) / 1000).toFixed(2);
         const elapsed = ((Date.now() - startedAt) / 1000).toFixed(2);
-        this.logger.log(`UPLOAD S3 SUCCESS: key=${key} elapsed=${elapsed}s`);
+        this.logger.log(`UPLOAD S3 SUCCESS: key=${key} elapsed=${elapsed}s s3Only=${s3Only}s`);
         publicPath = key;
       } else {
         const uploadsDir = path.join(process.cwd(), 'uploads');
         await fs.promises.mkdir(uploadsDir, { recursive: true });
         const fullPath = path.join(uploadsDir, fileName);
-        this.logger.log(`UPLOAD LOCAL: writing to ${fullPath} ...`);
-        await fs.promises.writeFile(fullPath, file.buffer);
+        if (file.path) {
+          this.logger.log(`UPLOAD LOCAL: move ${file.path} → ${fullPath} ...`);
+          try { await fs.promises.rename(file.path, fullPath); } catch { await fs.promises.copyFile(file.path, fullPath); await fs.promises.unlink(file.path); }
+        } else {
+          this.logger.log(`UPLOAD LOCAL: writing buffer to ${fullPath} ...`);
+          await fs.promises.writeFile(fullPath, file.buffer);
+        }
         publicPath = `/uploads/${fileName}`;
         const elapsed = ((Date.now() - startedAt) / 1000).toFixed(2);
         this.logger.log(`UPLOAD LOCAL SUCCESS: path=${publicPath} elapsed=${elapsed}s`);
       }
 
+      this.cleanupTemp(file);
       return this.prisma.file.create({
         data: {
           originalName: file.originalname,
@@ -154,11 +186,20 @@ export class FilesService {
         }`,
         error instanceof Error ? error.stack : undefined,
       );
+      this.cleanupTemp(file);
       if (error instanceof BadRequestException) throw error;
       throw new InternalServerErrorException(
         'Error uploading file. Check server logs for more details.',
       );
     }
+  }
+
+  private cleanupTemp(file: Express.Multer.File | null | undefined) {
+    if (!file || !file.path) return;
+    const p: string = file.path;
+    fs.promises.unlink(p).catch((e) => {
+      this.logger.debug(`cleanupTemp no pudo borrar ${p}: ${e?.message || String(e)}`);
+    });
   }
 
   async remove(id: string) {
