@@ -1,5 +1,5 @@
-import { NestFactory } from '@nestjs/core';
-import { Logger, ValidationPipe } from '@nestjs/common';
+﻿import { NestFactory } from '@nestjs/core';
+import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { json, urlencoded } from 'express';
@@ -26,7 +26,7 @@ async function bootstrap() {
 
   if (!Number.isFinite(port) || port <= 0 || port > 65535) {
     logger.error(
-      `Puerto inválido en PORT='${rawPort}'. Usa un número entre 1 y 65535.`,
+      `Puerto inv├ílido en PORT='${rawPort}'. Usa un n├║mero entre 1 y 65535.`,
     );
     process.exit(1);
   }
@@ -46,7 +46,12 @@ async function bootstrap() {
   app.use(json({ limit: DEFAULT_BODY_LIMIT }));
   app.use(urlencoded({ extended: true, limit: DEFAULT_BODY_LIMIT }));
 
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api', {
+    exclude: [
+      { path: 'uploads/*', method: RequestMethod.GET },
+      { path: 'public/files/:id', method: RequestMethod.GET },
+    ],
+  });
   app.enableCors({
     origin: true,
     credentials: true,
@@ -104,7 +109,7 @@ async function bootstrap() {
     const code: string | undefined = error?.code;
     if (code === 'EADDRINUSE') {
       logger.error(
-        `No se pudo arrancar el backend: el puerto ${port} ya está en uso (EADDRINUSE). ` +
+        `No se pudo arrancar el backend: el puerto ${port} ya est├í en uso (EADDRINUSE). ` +
           `Cierra el proceso que lo ocupa o cambia el valor de PORT en tu .env.`,
       );
     } else {

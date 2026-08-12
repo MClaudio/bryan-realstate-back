@@ -103,7 +103,7 @@ export class FilesService {
     );
 
     if (sizeMb > this.maxUploadMb) {
-      const msg = `El archivo pesa ${sizeMb.toFixed(2)}MB y el límite es ${this.maxUploadMb}MB`;
+      const msg = `El archivo pesa ${sizeMb.toFixed(2)}MB y el l├¡mite es ${this.maxUploadMb}MB`;
       this.logger.warn(`UPLOAD REJECTED (oversized): ${msg}`);
       throw new BadRequestException(msg);
     }
@@ -159,24 +159,6 @@ export class FilesService {
         'Error uploading file. Check server logs for more details.',
       );
     }
-  }
-
-  async findAll() {
-    return this.prisma.file.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  async findOne(id: string) {
-    const file = await this.prisma.file.findUnique({
-      where: { id },
-    });
-
-    if (!file) {
-      throw new NotFoundException(`File with ID ${id} not found`);
-    }
-
-    return file;
   }
 
   async remove(id: string) {
@@ -262,5 +244,62 @@ export class FilesService {
     }
     const url = `${req.protocol}://${req.get('host')}${file.path}`;
     return { url, size: file.size, originalName: file.originalName };
+  }
+
+  async getPublicUrl(file: any): Promise<{ url: string } | null> {
+    if (!file || !file.path) return null;
+    if (this.useS3) {
+      let key: string = file.path;
+      if (/^https?:\/\/.+\.amazonaws\.com\//i.test(key)) {
+        key = key.split('.amazonaws.com/')[1];
+      } else if (/^https?:\/\//i.test(key)) {
+        try {
+          const u = new URL(key);
+          key = u.pathname.replace(/^\//, '');
+        } catch {
+          /* noop */
+        }
+      }
+      try {
+        const command = new GetObjectCommand({ Bucket: this.bucketName, Key: key });
+        const signed = await getSignedUrl(this.s3Client, command, { expiresIn: 600 });
+        return { url: signed };
+      } catch (e: any) {
+        this.logger.warn(`getPublicUrl S3 falló para ${file.id}: ${e?.message || String(e)}`);
+        return null;
+      }
+    }
+    const raw: string = file.path;
+    const relative = raw.startsWith('/') ? raw : `/${raw}`;
+    const publicBase = String(
+      process.env.PUBLIC_URL || process.env.FRONT_URL || process.env.FRONTEND_URL || '',
+    ).replace(/\/+$/, '');
+    return { url: publicBase ? `${publicBase}${relative}` : relative };
+  }
+
+  async enrichFile(file: any): Promise<any> {
+    if (!file) return file;
+    try {
+      const enriched = await this.getPublicUrl(file);
+      if (enriched?.url) {
+        return { ...file, path: enriched.url };
+      }
+    } catch (e: any) {
+      this.logger.warn(`enrichFile falló para ${file?.id}: ${e?.message || String(e)}`);
+    }
+    return file;
+  }
+
+  async findAll() {
+    const files = await this.prisma.file.findMany({ orderBy: { createdAt: 'desc' } });
+    const out: any[] = [];
+    for (const f of files) out.push(await this.enrichFile(f));
+    return out;
+  }
+
+  async findOne(id: string) {
+    const file = await this.prisma.file.findUnique({ where: { id } });
+    if (!file) throw new NotFoundException(`File with ID ${id} not found`);
+    return this.enrichFile(file);
   }
 }

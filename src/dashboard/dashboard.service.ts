@@ -1,9 +1,37 @@
 import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
+import { FilesService } from '../files/files.service'
 
 @Injectable()
 export class DashboardService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private readonly filesService: FilesService,
+  ) { }
+
+  private async enrichLatest(properties: any[]): Promise<any[]> {
+    if (!Array.isArray(properties) || properties.length === 0) return properties
+    const out: any[] = []
+    for (const p of properties) {
+      if (!p) { out.push(p); continue }
+      const files = p.files
+      if (Array.isArray(files)) {
+        const enriched: any[] = []
+        for (const pf of files) {
+          if (pf?.file) {
+            const ef = await this.filesService.enrichFile(pf.file)
+            enriched.push({ ...pf, file: ef })
+          } else {
+            enriched.push(pf)
+          }
+        }
+        out.push({ ...p, files: enriched })
+      } else {
+        out.push(p)
+      }
+    }
+    return out
+  }
 
   async overview() {
     const [usersCount, clientsCount, propertiesCount, publicPropertiesCount] = await Promise.all([
@@ -23,7 +51,7 @@ export class DashboardService {
       _avg: { price: true, salePrice: true },
     })
 
-    const latestProperties = await this.prisma.property.findMany({
+    const latestRaw = await this.prisma.property.findMany({
       orderBy: { createdAt: 'desc' },
       take: 5,
       include: {
@@ -31,6 +59,7 @@ export class DashboardService {
         files: { include: { file: true } },
       },
     })
+    const latestProperties = await this.enrichLatest(latestRaw)
 
     return {
       counters: {
