@@ -19,11 +19,30 @@ const tmpDir = path.join(process.cwd(), '.tmp', 'multer');
 try { fs.mkdirSync(tmpDir, { recursive: true }); } catch { /* noop */ }
 
 @Controller('files')
-@UseGuards(JwtAuthGuard)
 export class FilesController {
   private readonly logger = new Logger(FilesController.name);
   constructor(private readonly filesService: FilesService) { }
 
+  /**
+   * PUBLIC (sin JWT) endpoint para diagnosticar config S3 en producción.
+   * NO expone secretos; solo presencia, bucket, región, modo storage.
+   * Usage: curl https://api.tudominio.com/api/files/s3-diag
+   */
+  @Get('s3-diag')
+  s3Diag() {
+    try {
+      return this.filesService.getS3Diagnostic();
+    } catch (e: any) {
+      this.logger.error(`s3-diag error: ${e?.name ?? 'Error'}: ${e?.message || String(e)}`);
+      return {
+        ok: false,
+        error: e?.message || String(e),
+        hint: 'See backend logs. Check FilesService constructor throwed?',
+      };
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -55,21 +74,25 @@ export class FilesController {
     return this.filesService.uploadFile(file, description);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get()
   findAll() {
     return this.filesService.findAll();
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.filesService.findOne(id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get(':id/url')
   getUrl(@Param('id') id: string, @Req() req: any) {
     return this.filesService.getUrl(id, req);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.filesService.remove(id);
