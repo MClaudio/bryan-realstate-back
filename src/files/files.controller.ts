@@ -4,13 +4,30 @@ import { FilesService } from './files.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import * as multer from 'multer';
 
+const DEFAULT_MAX_FILE_SIZE_MB = 10;
+const getMaxFileSizeBytes = (): number => {
+  const raw = process.env.MAX_UPLOAD_MB;
+  const mb = raw ? Number.parseInt(raw, 10) : NaN;
+  const safe = Number.isFinite(mb) && mb > 0 ? mb : DEFAULT_MAX_FILE_SIZE_MB;
+  return safe * 1024 * 1024;
+};
+
 @Controller('files')
 @UseGuards(JwtAuthGuard)
 export class FilesController {
   constructor(private readonly filesService: FilesService) { }
 
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file', { storage: multer.memoryStorage() }))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: multer.memoryStorage(),
+      limits: {
+        fileSize: getMaxFileSizeBytes(),
+        fields: 10,
+        headerPairs: 200,
+      },
+    }),
+  )
   uploadFile(
     @UploadedFile() file: Express.Multer.File,
     @Body('description') description?: string,
