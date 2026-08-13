@@ -71,7 +71,9 @@ export class FilesController {
       `[uploadFile.ctrl] received Multer file at t=${Date.now() - t0}ms original=${file?.originalname} size=${file?.size}B type=${file?.mimetype} path=${file?.path ?? '(no disk path)'} bufferLen=${bufferLen ?? 'N/A'} content-length=${req?.headers?.['content-length'] ?? '?'}B`,
     );
     if (!file) throw new BadRequestException('No file provided');
-    return this.filesService.uploadFile(file, description);
+    // Return the record WITH presigned URL / placeholder already enriched so the
+    // frontend doesn't need a second GET /files/:id/url roundtrip.
+    return this.filesService.uploadFile(file, description).then((record) => this.filesService.enrichFile(record));
   }
 
   @UseGuards(JwtAuthGuard)

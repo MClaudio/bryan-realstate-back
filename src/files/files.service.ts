@@ -172,7 +172,7 @@ export class FilesService {
       awsAccessKeyIdMasked: masked(accessKeyId, 16),
       awsSecretAccessKeyMasked: masked(secretAccessKey, 20),
       missingS3Vars,
-      useS3,
+      useS3: this.useS3,
       maxUploadMb: this.maxUploadMb,
       timeoutsSec: {
         request: Math.round(requestTimeout / 1000),
@@ -500,36 +500,104 @@ export class FilesService {
     return deletedFile;
   }
 
-  async getUrl(id: string, req: { protocol: string; get(header: string): string }) {
-    const file = await this.prisma.file.findUnique({ where: { id } });
-    if (!file) throw new NotFoundException(`File with ID ${id} not found`);
-
-    if (this.useS3) {
-      let key = file.path;
-      if (key.includes('.amazonaws.com/')) {
-        key = key.split('.amazonaws.com/')[1];
-      }
-      const command = new GetObjectCommand({
-        Bucket: this.bucketName,
-        Key: key,
-      });
-      const expiresInSec = 60 * 10;
-      const url = await getSignedUrl(this.s3Client as any, command, { expiresIn: expiresInSec });
-      this.logger.debug(`Signed URL for ${id} expires in ${expiresInSec}s`);
-      return { url, size: file.size, originalName: file.originalName };
-    }
-    const url = `${req.protocol}://${req.get('host')}${file.path}`;
-    return { url, size: file.size, originalName: file.originalName };
+  /**
+   * Always-safe placeholder image: inline SVG that works for broken/missing
+   * uploads. 100% offline, no network calls, no 404, no infinite loops.
+   *
+   * Keep this tiny. It renders a "No image available" placeholder 400x300.
+   */
+  private getFallbackPlaceholderUrl(): string {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid">
+      <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#e5e7eb"/><stop offset="1" stop-color="#cbd5e1"/></linearGradient></defs>
+      <rect width="400" height="300" fill="url(#g)"/>
+      <circle cx="200" cy="130" r="38" fill="#94a3b8"/>
+      <path d="M70 270 L150 190 L210 240 L260 200 L330 270 Z" fill="#94a3b8" opacity="0.6"/>
+      <rect x="40" y="40" width="320" height="220" rx="12" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4 6"/>
+      <text x="200" y="292" font-family="system-ui,Arial,sans-serif" font-size="14" text-anchor="middle" fill="#475569" font-weight="600">Imagen no disponible</text>
+    </svg>`;
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   }
 
-  async getPublicUrl(file: any): Promise<{ url: string } | null> {
+  async getUrl(id: string, req: { protocol: string; get(header: string): string }) {
+    const t0 = Date.now();
+    const file = await this.prisma.file.findUnique({ where: { id } });
     if (!file) {
-      this.logger.debug(`[getPublicUrl] file is null/undefined → return null`);
-      return null;
+      this.logger.warn(`[getUrl] file.id=${id} not found in DB (404). Returning placeholder to avoid frontend errors.`);
+      return { url: this.getFallbackPlaceholderUrl(), size: 0, originalName: 'not-found.png', notFound: true as const };
+    }
+
+    // Case 1: Already enriched absolute URL (rare, but works).
+    if (/^https?:\/\//i.test(file.path || '')) {
+      this.logger.debug(`[getUrl] id=${id} already absolute URL (${((Date.now() - t0))}ms)`);
+      return { url: file.path, size: file.size, originalName: file.originalName };
+    }
+
+    if (this.useS3 && this.s3Client) {
+      try {
+        let key: string = file.path;
+        const originalDbPath = key;
+        if (key.includes('.amazonaws.com/')) {
+          key = key.split('.amazonaws.com/')[1];
+        } else if (/^https?:\/\//i.test(key)) {
+          try { key = new URL(key).pathname.replace(/^\//, ''); } catch { /* keep */ }
+        }
+        const command = new GetObjectCommand({ Bucket: this.bucketName, Key: key });
+        const expiresInSec = 60 * 10;
+        const signed = await getSignedUrl(this.s3Client as any, command, { expiresIn: expiresInSec });
+        this.logger.debug(`[getUrl] id=${id} S3 presign OK t=${Date.now() - t0}ms`);
+        return { url: signed, size: file.size, originalName: file.originalName };
+      } catch (e: any) {
+        const meta = (e?.$metadata ?? {}) as Record<string, any>;
+        const code = String((e as any).Code ?? e?.name ?? 'UnknownError');
+        this.logger.error(
+          `[getUrl] ✗ S3 presign FAIL for id=${id} key=${JSON.stringify(file.path)} HTTP=${meta.httpStatusCode ?? '?'} AWS_CODE=${code} t=${Date.now() - t0}ms msg=${e?.message || String(e)}. Returning placeholder to prevent frontend infinite-looping /files/:id/url.`,
+          (e as Error)?.stack ?? undefined,
+        );
+        return {
+          url: this.getFallbackPlaceholderUrl(),
+          size: file.size,
+          originalName: file.originalName,
+          fallbackReason: 's3_presign_error',
+          s3Code: code,
+        };
+      }
+    }
+
+    // LOCAL mode: if file.path is relative, build absolute with req host.
+    try {
+      const raw = String(file.path || '').trim();
+      const relative = raw.startsWith('/') ? raw : raw ? `/${raw}` : '';
+      if (!relative) {
+        this.logger.warn(`[getUrl] id=${id} file.path is empty in LOCAL mode. Returning placeholder.`);
+        return { url: this.getFallbackPlaceholderUrl(), size: file.size, originalName: file.originalName };
+      }
+      const publicBase = String(
+        process.env.PUBLIC_URL || process.env.FRONT_URL || process.env.FRONTEND_URL || '',
+      ).replace(/\/+$/, '');
+      const host = `${req.protocol}://${req.get('host')}`;
+      const base = publicBase || host;
+      const url = `${base}${relative}`;
+      this.logger.debug(`[getUrl] id=${id} LOCAL mode final=${url} t=${Date.now() - t0}ms`);
+      return { url, size: file.size, originalName: file.originalName };
+    } catch (fallbackErr: any) {
+      this.logger.error(
+        `[getUrl] ✗ LOCAL mode buildUrl failed for id=${id}: ${fallbackErr?.message || String(fallbackErr)}. Returning placeholder.`,
+      );
+      return { url: this.getFallbackPlaceholderUrl(), size: file.size, originalName: file.originalName };
+    }
+  }
+
+  async getPublicUrl(file: any): Promise<{ url: string }> {
+    if (!file) {
+      this.logger.debug(`[getPublicUrl] file is null/undefined → return placeholder`);
+      return { url: this.getFallbackPlaceholderUrl() };
     }
     if (!file.path) {
-      this.logger.warn(`[getPublicUrl] ⚠ file.id=${file.id ?? '(no id)'} has EMPTY file.path in DB → return null`);
-      return null;
+      this.logger.warn(`[getPublicUrl] ⚠ file.id=${file.id ?? '(no id)'} has EMPTY file.path in DB → return placeholder`);
+      return { url: this.getFallbackPlaceholderUrl() };
+    }
+    if (/^https?:\/\//i.test(String(file.path || ''))) {
+      return { url: String(file.path) };
     }
 
     const t0 = Date.now();
@@ -537,8 +605,8 @@ export class FilesService {
 
     if (this.useS3) {
       if (!this.s3Client) {
-        this.logger.error(`[getPublicUrl] ✗ useS3=true but this.s3Client is NULL (constructor fallback LOCAL). Abort for id=${file.id}`);
-        return null;
+        this.logger.error(`[getPublicUrl] ✗ useS3=true but this.s3Client is NULL (constructor fallback LOCAL). For file.id=${file.id} → return placeholder.`);
+        return { url: this.getFallbackPlaceholderUrl() };
       }
       let key: string = file.path;
       const originalKey = key;
@@ -581,7 +649,7 @@ export class FilesService {
           (e as Error)?.stack ?? undefined,
         );
         this.logger.debug(`[getPublicUrl] S3 full error for id=${file.id}: ${JSON.stringify(summary)}`);
-        return null;
+        return { url: this.getFallbackPlaceholderUrl() };
       }
     }
     const raw: string = file.path;
@@ -602,18 +670,16 @@ export class FilesService {
     const t0 = Date.now();
     try {
       const enriched = await this.getPublicUrl(file);
-      if (enriched?.url) {
-        this.logger.debug(`[enrichFile] id=${file?.id ?? '?'} t=${Date.now() - t0}ms ✓ path enriched`);
-        return { ...file, path: enriched.url };
-      }
-      this.logger.warn(`[enrichFile] id=${file?.id ?? '?'} t=${Date.now() - t0}ms ⚠ getPublicUrl returned NULL → returning DB path as-is ${JSON.stringify(file?.path)}`);
+      const safeUrl = enriched?.url || this.getFallbackPlaceholderUrl();
+      this.logger.debug(`[enrichFile] id=${file?.id ?? '?'} t=${Date.now() - t0}ms ✓ path enriched`);
+      return { ...file, path: safeUrl };
     } catch (e: any) {
       this.logger.error(
-        `[enrichFile] id=${file?.id ?? '?'} t=${Date.now() - t0}ms ✗ UNEXPECTED EXCEPTION: ${e?.name ?? 'Error'}: ${e?.message || String(e)}`,
+        `[enrichFile] id=${file?.id ?? '?'} t=${Date.now() - t0}ms ✗ UNEXPECTED EXCEPTION → returning placeholder: ${e?.name ?? 'Error'}: ${e?.message || String(e)}`,
         (e as Error)?.stack ?? undefined,
       );
+      return { ...file, path: this.getFallbackPlaceholderUrl() };
     }
-    return file;
   }
 
   async findAll() {
