@@ -278,15 +278,18 @@ model PropertyInterest {
 }
 
 model GoogleAuthToken {
-  id           String   @id @default(uuid()) @db.Uuid
-  provider     String   @unique @default("google")
-  accessToken  String   @map("access_token")
-  refreshToken String?  @map("refresh_token")
-  tokenType    String?  @map("token_type")
-  scope        String?
-  expiryDate   DateTime? @map("expiry_date")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id            String    @id @default(uuid()) @db.Uuid
+  provider      String    @unique @default("google")
+  accessToken   String    @map("access_token")
+  refreshToken  String?   @map("refresh_token")
+  tokenType     String?   @map("token_type")
+  scope         String?
+  expiryDate    DateTime? @map("expiry_date")
+  needsReauth   Boolean   @default(false) @map("needs_reauth")
+  lastRefreshAt DateTime? @map("last_refresh_at")
+  lastError     String?   @map("last_error")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   @@map("google_auth_tokens")
 }

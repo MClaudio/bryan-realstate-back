@@ -20,6 +20,11 @@ export class SyncContactsController {
     return this.syncContactsService.exchangeGoogleAuthCode(payload.code);
   }
 
+  @Get('google-status')
+  googleStatus() {
+    return this.syncContactsService.getGoogleStatus();
+  }
+
   @Get('google-preview')
   googlePreview(@Query('force') force?: string): Promise<GooglePreviewResponse> {
     return this.syncContactsService.getGooglePreview(force === 'true');
