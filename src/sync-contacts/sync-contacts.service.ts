@@ -51,6 +51,7 @@ export interface GooglePreviewResponse {
 export class SyncContactsService implements OnModuleInit {
     private readonly logger = new Logger(SyncContactsService.name);
     private readonly cronJobName = 'google-contacts-to-db-sync';
+    private readonly keepAliveCronJobName = 'google-token-keepalive';
 
     constructor(
         private readonly prisma: PrismaService,
@@ -78,6 +79,24 @@ export class SyncContactsService implements OnModuleInit {
         this.logger.log(
             `Cron job '${this.cronJobName}' started with expression '${cronExpression}' (TZ=${timezone})`,
         );
+
+        const keepAliveCronExpression =
+            this.configService.get<string>('GOOGLE_TOKEN_KEEPALIVE_CRON') ?? '0 3 * * *';
+
+        if (this.schedulerRegistry.doesExist('cron', this.keepAliveCronJobName)) {
+            this.schedulerRegistry.deleteCronJob(this.keepAliveCronJobName);
+        }
+
+        const keepAliveJob = new CronJob(keepAliveCronExpression, () => {
+            void this.googleTokenKeepAliveCron();
+        }, null, false, timezone);
+
+        this.schedulerRegistry.addCronJob(this.keepAliveCronJobName, keepAliveJob);
+        keepAliveJob.start();
+
+        this.logger.log(
+            `Cron job '${this.keepAliveCronJobName}' started with expression '${keepAliveCronExpression}' (TZ=${timezone})`,
+        );
     }
 
     getGoogleAuthUrl() {
@@ -88,6 +107,19 @@ export class SyncContactsService implements OnModuleInit {
 
     exchangeGoogleAuthCode(code: string) {
         return this.googleContactsService.exchangeCodeForTokens(code);
+    }
+
+    async getGoogleStatus() {
+        const status = await this.googleContactsService.getTokenStatus();
+        const lastLog = await this.prisma.contactSyncLog.findFirst({
+            orderBy: { createdAt: 'desc' },
+            select: { createdAt: true },
+        });
+
+        return {
+            ...status,
+            lastSyncAt: lastLog?.createdAt ?? null,
+        };
     }
 
     async clearExclusions() {
@@ -517,6 +549,16 @@ export class SyncContactsService implements OnModuleInit {
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
             this.logger.error(`Scheduled sync failed: ${message}`);
+        }
+    }
+
+    async googleTokenKeepAliveCron() {
+        try {
+            const { expiresAt } = await this.googleContactsService.ensureFreshToken();
+            this.logger.log(`Google token keep-alive OK. expiresAt=${expiresAt ?? 'unknown'}`);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            this.logger.error(`Google token keep-alive failed: ${message}`);
         }
     }
 

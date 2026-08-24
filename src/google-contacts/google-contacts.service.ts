@@ -57,6 +57,32 @@ export class GoogleContactsService {
     };
   }
 
+  async getTokenStatus() {
+    const token = await this.prisma.googleAuthToken.findUnique({
+      where: { provider: 'google' },
+    });
+
+    if (!token) {
+      return {
+        connected: false,
+        needsReauth: false,
+        hasRefreshToken: false,
+        expiresAt: null,
+        lastRefreshAt: null,
+        lastError: null,
+      };
+    }
+
+    return {
+      connected: !token.needsReauth,
+      needsReauth: token.needsReauth,
+      hasRefreshToken: Boolean(token.refreshToken),
+      expiresAt: token.expiryDate ? token.expiryDate.toISOString() : null,
+      lastRefreshAt: token.lastRefreshAt ? token.lastRefreshAt.toISOString() : null,
+      lastError: token.lastError,
+    };
+  }
+
   async listAllContacts(): Promise<GoogleContactPayload[]> {
     const people = await this.getPeopleClient();
     const contacts: GoogleContactPayload[] = [];
@@ -228,6 +254,16 @@ export class GoogleContactsService {
     return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
   }
 
+  /**
+   * Fuerza una obtención/renovación de access token, manteniendo vivo el
+   * refresh_token cuando el sistema está inactivo (Google los invalida tras ~6 meses sin uso).
+   */
+  async ensureFreshToken(): Promise<{ expiresAt: string | null }> {
+    const oauthClient = await this.getAuthorizedClient();
+    const expiryDate = oauthClient.credentials.expiry_date;
+    return { expiresAt: expiryDate ? new Date(expiryDate).toISOString() : null };
+  }
+
   private async getAuthorizedClient(): Promise<InstanceType<typeof google.auth.OAuth2>> {
     const oauthClient = this.createOAuthClient();
     const token = await this.prisma.googleAuthToken.findUnique({
@@ -236,6 +272,12 @@ export class GoogleContactsService {
 
     if (!token) {
       throw new BadRequestException('Google no está conectado. Autoriza la aplicación primero.');
+    }
+
+    if (token.needsReauth) {
+      throw new BadRequestException(
+        'La autorización de Google expiró o fue revocada. Vuelve a conectar Google Contacts.',
+      );
     }
 
     oauthClient.setCredentials({
@@ -252,12 +294,17 @@ export class GoogleContactsService {
       });
     });
 
-    const isExpired = token.expiryDate ? token.expiryDate.getTime() <= Date.now() : false;
+    const REFRESH_MARGIN_MS = 5 * 60_000;
+    const isExpired = token.expiryDate
+      ? token.expiryDate.getTime() <= Date.now() + REFRESH_MARGIN_MS
+      : true;
+
     if (isExpired && token.refreshToken) {
       try {
-        const { credentials } = await oauthClient.refreshAccessToken();
-        await this.persistTokens(credentials);
-        oauthClient.setCredentials(credentials);
+        const accessTokenResponse = await oauthClient.getAccessToken();
+        if (!accessTokenResponse.token) {
+          throw new BadRequestException('Google no devolvió un access_token al renovar');
+        }
       } catch (error) {
         if (await this.handleInvalidGrantError(error)) {
           throw new BadRequestException(
@@ -290,6 +337,9 @@ export class GoogleContactsService {
         tokenType: tokens.token_type ?? null,
         scope: tokens.scope ?? null,
         expiryDate: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+        needsReauth: false,
+        lastError: null,
+        lastRefreshAt: new Date(),
       },
       update: {
         accessToken,
@@ -297,6 +347,9 @@ export class GoogleContactsService {
         tokenType: tokens.token_type ?? existing?.tokenType ?? null,
         scope: tokens.scope ?? existing?.scope ?? null,
         expiryDate: tokens.expiry_date ? new Date(tokens.expiry_date) : existing?.expiryDate ?? null,
+        needsReauth: false,
+        lastError: null,
+        lastRefreshAt: new Date(),
       },
     });
   }
@@ -372,8 +425,14 @@ export class GoogleContactsService {
       return false;
     }
 
-    this.logger.warn('Google OAuth devolvió invalid_grant. Se limpiará el token local para requerir reconexión.');
-    await this.prisma.googleAuthToken.deleteMany({ where: { provider: 'google' } });
+    this.logger.error('Google OAuth devolvió invalid_grant. Se requiere reconectar la cuenta de Google.');
+    await this.prisma.googleAuthToken.updateMany({
+      where: { provider: 'google' },
+      data: {
+        needsReauth: true,
+        lastError: gaxiosError.response?.data?.error_description ?? gaxiosError.message ?? 'invalid_grant',
+      },
+    });
     return true;
   }
 }
