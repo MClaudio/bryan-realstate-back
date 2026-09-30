@@ -3,6 +3,7 @@ import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { GeneratePropertyDescriptionsDto } from './dto/generate-property-descriptions.dto';
 
 @Controller('properties')
 export class PropertiesController {
@@ -18,6 +19,13 @@ export class PropertiesController {
   async resolveMapsUrl(@Query('url') url: string) {
     if (!url) throw new BadRequestException('url query param is required');
     return this.propertiesService.resolveMapsUrl(url);
+  }
+
+  /** Genera con IA la descripción corta y larga pública con los datos del formulario (no guarda). */
+  @Post('generate-descriptions')
+  @UseGuards(JwtAuthGuard)
+  generateDescriptions(@Body() dto: GeneratePropertyDescriptionsDto) {
+    return this.propertiesService.generatePublicDescriptions(dto);
   }
 
   @Post(':id/recommendations')
@@ -37,6 +45,19 @@ export class PropertiesController {
     });
   }
 
+  /** Latest stored AI recommendation that can be restored without calling n8n. */
+  @Get(':id/recommendations/last')
+  @UseGuards(JwtAuthGuard)
+  lastRecommendation(@Param('id') id: string) {
+    return this.propertiesService.lastRecommendationInfo(id);
+  }
+
+  @Post(':id/recommendations/restore-last')
+  @UseGuards(JwtAuthGuard)
+  restoreLastRecommendation(@Param('id') id: string) {
+    return this.propertiesService.restoreLastRecommendation(id);
+  }
+
   @Post()
   @UseGuards(JwtAuthGuard)
   create(@Body() createPropertyDto: CreatePropertyDto, @Req() req: any) {
@@ -51,7 +72,7 @@ export class PropertiesController {
 
   @Get('public')
   findAllPublic() {
-    return this.propertiesService.findAll();
+    return this.propertiesService.findAllPublic();
   }
 
   @Get('featured')

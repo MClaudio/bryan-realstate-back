@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@n
 import { ClientsService } from './clients.service';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
+import { NormalizeClientDto } from './dto/normalize-client.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('clients')
@@ -12,6 +13,11 @@ export class ClientsController {
   @Post()
   create(@Body() createClientDto: CreateClientDto) {
     return this.clientsService.create(createClientDto);
+  }
+
+  @Post('normalize')
+  normalize(@Body() normalizeClientDto: NormalizeClientDto) {
+    return this.clientsService.normalize(normalizeClientDto);
   }
 
   @Get()

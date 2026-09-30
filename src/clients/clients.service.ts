@@ -1,6 +1,14 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { CreateClientDto } from './dto/create-client.dto';
 import { UpdateClientDto } from './dto/update-client.dto';
+import { NormalizeClientDto } from './dto/normalize-client.dto';
+import { ContactAiParserService } from '../ai/contact-ai-parser.service';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { SyncContactsService } from '../sync-contacts/sync-contacts.service';
@@ -12,7 +20,28 @@ export class ClientsService {
   constructor(
     private prisma: PrismaService,
     private syncContactsService: SyncContactsService,
+    private contactAiParser: ContactAiParserService,
   ) {}
+
+  /** Devuelve una sugerencia normalizada con IA de los datos del formulario. No guarda nada. */
+  async normalize(dto: NormalizeClientDto) {
+    const { contact, error } = await this.contactAiParser.parseContactDetailed({
+      givenName: dto.firstName ?? null,
+      familyName: dto.lastName ?? null,
+      phones: dto.phone ? [dto.phone] : [],
+      emails: dto.email ? [dto.email] : [],
+      birthday: dto.birthDate ?? null,
+      address: dto.address ?? null,
+      notes: dto.notes ?? null,
+      interestDescription: dto.interestDescription ?? null,
+    });
+
+    if (!contact) {
+      throw new ServiceUnavailableException(error ?? 'No se pudo normalizar con IA. Intenta nuevamente.');
+    }
+
+    return contact;
+  }
 
   async create(createClientDto: CreateClientDto) {
     if (createClientDto.email) {

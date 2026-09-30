@@ -11,6 +11,8 @@ import { ConfigurationsModule } from './configurations/configurations.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ProcessesModule } from './processes/processes.module';
 import { PropertyInterestsModule } from './property-interests/property-interests.module';
+import { PropertyChecklistModule } from './property-checklist/property-checklist.module';
+import { SaleProcessesModule } from './sale-processes/sale-processes.module';
 import { BlacklistModule } from './blacklist/blacklist.module';
 import { GoogleContactsModule } from './google-contacts/google-contacts.module';
 import { SyncContactsModule } from './sync-contacts/sync-contacts.module';
@@ -31,6 +33,8 @@ import { RecommendationSchedulerModule } from './recommendation-scheduler/recomm
     DashboardModule,
     ProcessesModule,
     PropertyInterestsModule,
+    PropertyChecklistModule,
+    SaleProcessesModule,
     BlacklistModule,
     GoogleContactsModule,
     SyncContactsModule,

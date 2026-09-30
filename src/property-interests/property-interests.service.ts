@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePropertyInterestDto } from './dto/create-property-interest.dto';
 import { UpdatePropertyInterestDto } from './dto/update-property-interest.dto';
@@ -121,9 +121,15 @@ export class PropertyInterestsService {
   async reconcileRecommendations(
     propertyId: string,
     recommendations: Array<{ client_id?: string; clientId?: string; interest_level?: unknown; interestLevel?: unknown; reason?: string; notes?: string; interestDate?: string }>,
+    /**
+     * `removeMissing: false` solo agrega/actualiza: los interesados que no vienen en la lista se
+     * conservan. Es lo que usa la IA, que no recibe a los clientes ya vinculados.
+     */
+    options: { removeMissing?: boolean } = {},
   ) {
-    const property = await this.prisma.property.findUnique({
-      where: { id: propertyId },
+    const removeMissing = options.removeMissing ?? true;
+    const property = await this.prisma.property.findFirst({
+      where: { id: propertyId, deletedAt: null },
       select: { id: true, code: true },
     });
     if (!property) {
@@ -154,6 +160,18 @@ export class PropertyInterestsService {
       if (!prev || INTEREST_LEVEL_RANK[level] > INTEREST_LEVEL_RANK[prev.level]) {
         normalizedMap.set(clientId, { level, notes, interestDate });
       }
+    }
+
+    // Ids the AI invented or took from another source would make `connect`
+    // fail and roll back the whole sync; drop them instead.
+    const validIds = await this.existingClientIds([...normalizedMap.keys()]);
+    const discarded = [...normalizedMap.keys()].filter((cid) => !validIds.has(cid));
+    for (const cid of discarded) normalizedMap.delete(cid);
+    if (discarded.length > 0 && normalizedMap.size === 0) {
+      // Never let a list of bogus ids turn into "delete every interested client".
+      throw new BadRequestException(
+        'ninguno de los clientes recomendados existe en Clientes',
+      );
     }
 
     const existing = await this.prisma.propertyInterest.findMany({
@@ -194,19 +212,19 @@ export class PropertyInterestsService {
               },
               select: { id: true },
             });
+            toUpdate.push(clientId);
           }
-          toUpdate.push(clientId);
         }
       }
 
       const wantedIds = new Set(normalizedMap.keys());
-      for (const curr of existing) {
+      for (const curr of removeMissing ? existing : []) {
         if (!wantedIds.has(curr.clientId)) {
           await tx.propertyInterest.delete({ where: { id: curr.id } });
           toDelete.push(curr.clientId);
         }
       }
-    });
+    }, { timeout: 30000 }); // remote DB + one round trip per row
 
     return {
       propertyId,
@@ -215,9 +233,22 @@ export class PropertyInterestsService {
         created: toCreate.length,
         updated: toUpdate.length,
         deleted: toDelete.length,
+        discarded: discarded.length,
       },
-      clientChanges: { created: toCreate, updated: toUpdate, deleted: toDelete },
+      clientChanges: { created: toCreate, updated: toUpdate, deleted: toDelete, discarded },
       interests: await this.findAllByProperty(propertyId),
     };
+  }
+
+  /** Subset of `ids` that are real clients (malformed UUIDs are ignored). */
+  async existingClientIds(ids: string[]): Promise<Set<string>> {
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const wellFormed = ids.filter((id) => uuidRe.test(id));
+    if (wellFormed.length === 0) return new Set();
+    const rows = await this.prisma.client.findMany({
+      where: { id: { in: wellFormed } },
+      select: { id: true },
+    });
+    return new Set(rows.map((r) => r.id));
   }
 }

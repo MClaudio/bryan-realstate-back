@@ -30,11 +30,13 @@ export class UpdatePropertyDto {
   address?: string;
 
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @ValidateIf((o) => o.cityId !== undefined)
   @IsUUID()
   @IsNotEmpty()
   cityId?: string;
 
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @ValidateIf((o) => o.referenceSector !== undefined)
   @IsString()
   @IsNotEmpty()
   referenceSector?: string;
@@ -105,6 +107,17 @@ export class UpdatePropertyDto {
   @IsString()
   @IsOptional()
   observations?: string;
+
+  // Descripciones públicas (lo que se envía/muestra al cliente). Vacío → null.
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? null : value))
+  @IsString()
+  @IsOptional()
+  publicShortDescription?: string | null;
+
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? null : value))
+  @IsString()
+  @IsOptional()
+  publicLongDescription?: string | null;
 
   @IsEnum(PropertyStatus)
   @IsOptional()

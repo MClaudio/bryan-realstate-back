@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { FilesService } from '../files/files.service'
 
+// Soft-deleted properties are excluded from every dashboard figure.
+const notDeleted = { deletedAt: null }
+
 @Injectable()
 export class DashboardService {
   constructor(
@@ -37,21 +40,24 @@ export class DashboardService {
     const [usersCount, clientsCount, propertiesCount, publicPropertiesCount] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.client.count(),
-      this.prisma.property.count(),
-      this.prisma.property.count({ where: { isPublic: true } }),
+      this.prisma.property.count({ where: notDeleted }),
+      this.prisma.property.count({ where: { ...notDeleted, isPublic: true } }),
     ])
 
     const propertiesByStatus = await this.prisma.property.groupBy({
+      where: notDeleted,
       by: ['status'],
       _count: { id: true },
     })
 
     const priceAgg = await this.prisma.property.aggregate({
+      where: notDeleted,
       _sum: { price: true, salePrice: true, commission: true },
       _avg: { price: true, salePrice: true },
     })
 
     const latestRaw = await this.prisma.property.findMany({
+      where: notDeleted,
       orderBy: { createdAt: 'desc' },
       take: 5,
       include: {
@@ -76,18 +82,22 @@ export class DashboardService {
 
   async propertyStats() {
     const byType = await this.prisma.property.groupBy({
+      where: notDeleted,
       by: ['propertyType'],
       _count: { id: true },
     })
     const byZone = await this.prisma.property.groupBy({
+      where: notDeleted,
       by: ['zone'],
       _count: { id: true },
     })
     const byTopography = await this.prisma.property.groupBy({
+      where: notDeleted,
       by: ['topography'],
       _count: { id: true },
     })
     const priceAgg = await this.prisma.property.aggregate({
+      where: notDeleted,
       _min: { price: true, salePrice: true },
       _max: { price: true, salePrice: true },
       _avg: { price: true, salePrice: true },
@@ -132,6 +142,7 @@ export class DashboardService {
         },
       }),
       this.prisma.property.findMany({
+        where: notDeleted,
         orderBy: { createdAt: 'desc' },
         take: 5,
         select: {
