@@ -5,6 +5,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { PropertyRecommendationService } from './property-recommendation.service';
 import { RecommendationQueueService } from './recommendation-queue.service';
 import { RecommendationRunnerService } from './recommendation-runner.service';
+import { PropertyProposalService } from './property-proposal.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PropertyInterestsModule } from '../property-interests/property-interests.module';
 import { FilesModule } from '../files/files.module';
@@ -18,6 +19,7 @@ import { AiModule } from '../ai/ai.module';
     PropertyRecommendationService,
     RecommendationQueueService,
     RecommendationRunnerService,
+    PropertyProposalService,
   ],
   exports: [
     PropertiesService,
