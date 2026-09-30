@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsArray, IsOptional, IsString } from 'class-validator';
 
 export class GoogleContactSelectionDto {
   @IsString()
@@ -32,4 +32,27 @@ export class GoogleContactSelectionDto {
   @IsString()
   @IsOptional()
   phone?: string;
+
+  // Contexto crudo de Google usado por la normalización con IA
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  phones?: string[];
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  emails?: string[];
+
+  @IsString()
+  @IsOptional()
+  birthday?: string;
+
+  @IsString()
+  @IsOptional()
+  address?: string;
+
+  @IsString()
+  @IsOptional()
+  organization?: string;
 }

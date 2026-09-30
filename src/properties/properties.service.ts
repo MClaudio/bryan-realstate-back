@@ -1,12 +1,15 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { PropertyStatus, FileType, Prisma } from '@prisma/client';
 import { RecommendationQueueService } from './recommendation-queue.service';
-import { PropertyRecommendationService } from './property-recommendation.service';
-import { PropertyInterestsService } from '../property-interests/property-interests.service';
 import { FilesService } from '../files/files.service';
+import { propertyInclude } from './property-include';
+import { RecommendationRunnerService } from './recommendation-runner.service';
+import { newSaleProcessCreate } from '../sale-processes/sale-process.rules';
+import { PropertyDescriptionAiService } from '../ai/property-description-ai.service';
+import { GeneratePropertyDescriptionsDto } from './dto/generate-property-descriptions.dto';
 
 const dmmfModels: Array<{ name: string; fields: Array<{ name: string }> }> =
   (Prisma as any).dmmf?.datamodel?.models ?? [];
@@ -14,52 +17,91 @@ const propertyModelFields = new Set(
   dmmfModels.find((m) => m.name === 'Property')?.fields.map((f) => f.name) ?? [],
 );
 
-const propertyInclude = {
-  city: {
-    select: {
-      id: true,
-      name: true,
-    },
-  },
-  advisor: {
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-    },
-  },
-  negotiationClient: {
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      phone: true,
-    },
-  },
-  files: {
-    orderBy: [
-      { sortOrder: 'asc' as const },
-      { createdAt: 'asc' as const },
-    ],
-    include: {
-      file: true,
-    },
-  },
-};
-
 function omitUndefined<T extends Record<string, any>>(obj: T): T {
   return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
 }
 
 @Injectable()
 export class PropertiesService {
+  private readonly logger = new Logger(PropertiesService.name);
+
   constructor(
     private prisma: PrismaService,
     private readonly recommendationQueueService: RecommendationQueueService,
-    private readonly propertyRecommendationService: PropertyRecommendationService,
-    private readonly propertyInterestsService: PropertyInterestsService,
+    private readonly recommendationRunner: RecommendationRunnerService,
     private readonly filesService: FilesService,
+    private readonly propertyDescriptionAi: PropertyDescriptionAiService,
   ) { }
+
+  /**
+   * Solo se encola la recomendación IA si la propiedad está en Nuevo y cambiaron los datos
+   * que usa la IA (fotos, redes, precio mínimo, comisión, etc. no cuentan).
+   */
+  private shouldQueueRecommendation(property: Parameters<RecommendationRunnerService['computeHash']>[0] & {
+    status: PropertyStatus;
+    recommendationHash: string | null;
+  }): boolean {
+    if (property.status !== PropertyStatus.Nuevo) return false;
+    return this.recommendationRunner.computeHash(property) !== property.recommendationHash;
+  }
+
+  /** Genera con IA las descripciones públicas a partir de los datos del formulario (no guarda). */
+  async generatePublicDescriptions(dto: GeneratePropertyDescriptionsDto) {
+    const city = dto.cityId
+      ? await this.prisma.city.findUnique({ where: { id: dto.cityId }, select: { name: true } })
+      : null;
+
+    const { descriptions, error } = await this.propertyDescriptionAi.generate({
+      ...dto,
+      cityName: city?.name ?? null,
+    });
+
+    if (!descriptions) {
+      throw new ServiceUnavailableException(error ?? 'No se pudieron generar las descripciones con IA.');
+    }
+
+    return {
+      publicShortDescription: descriptions.shortDescription,
+      publicLongDescription: descriptions.longDescription,
+    };
+  }
+
+  /**
+   * Al guardar, si la propiedad no tiene descripciones públicas, se generan en segundo plano
+   * para no demorar el guardado. No sobreescribe descripciones escritas mientras tanto.
+   */
+  private scheduleAutoDescriptions(propertyId: string) {
+    if (!this.propertyDescriptionAi.shouldAutoGenerateOnSave()) return;
+
+    void (async () => {
+      const property = await this.prisma.property.findFirst({
+        where: { id: propertyId, deletedAt: null },
+        include: { city: { select: { name: true } } },
+      });
+      if (!property || property.publicShortDescription || property.publicLongDescription) return;
+
+      const { descriptions, error } = await this.propertyDescriptionAi.generate({
+        ...property,
+        cityName: property.city?.name ?? null,
+      });
+      if (!descriptions) {
+        this.logger.warn(`Descripciones automáticas no generadas para ${propertyId}: ${error}`);
+        return;
+      }
+
+      const { count } = await this.prisma.property.updateMany({
+        where: { id: propertyId, publicShortDescription: null, publicLongDescription: null },
+        data: {
+          publicShortDescription: descriptions.shortDescription,
+          publicLongDescription: descriptions.longDescription,
+        },
+      });
+      if (count > 0) this.logger.log(`Descripciones públicas generadas con IA para la propiedad ${propertyId}`);
+    })().catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      this.logger.error(`Error generando descripciones automáticas para ${propertyId}: ${message}`);
+    });
+  }
 
   private async enrichPropertiesFiles(properties: any[]): Promise<any[]> {
     if (!Array.isArray(properties) || properties.length === 0) return properties;
@@ -91,6 +133,7 @@ export class PropertiesService {
   }
 
   async getCurrentSequence() {
+    // Counts soft-deleted properties too, so new codes never reuse an old one.
     const currentSequence = await this.prisma.property.count();
     return { currentSequence };
   }
@@ -157,6 +200,8 @@ export class PropertiesService {
     const property = await this.prisma.property.create({
       data: {
         ...omitUndefined(createData),
+        // Every new property starts with its sale process and all stages.
+        saleProcess: { create: newSaleProcessCreate },
         files: {
           create: [
             ...(fileIds ? fileIds.map((fid: string, index: number) => ({
@@ -177,15 +222,16 @@ export class PropertiesService {
 
     let recommendationJobId: string = "";
     let recommendationQueued = false;
-    if (property.status === PropertyStatus.Nuevo) {
+    if (this.shouldQueueRecommendation(property)) {
       recommendationJobId = await this.recommendationQueueService.enqueueRecommendation({
         propertyId: property.id,
         userId,
         trigger: 'create',
-        property,
       });
       recommendationQueued = true;
     }
+
+    this.scheduleAutoDescriptions(property.id);
 
     const enriched = await this.enrichPropertyFiles(property);
     return {
@@ -198,6 +244,16 @@ export class PropertiesService {
 
   async findAll() {
     const raw = await this.prisma.property.findMany({
+      where: { deletedAt: null },
+      include: propertyInclude,
+      orderBy: { createdAt: 'desc' },
+    });
+    return this.enrichPropertiesFiles(raw);
+  }
+
+  async findAllPublic() {
+    const raw = await this.prisma.property.findMany({
+      where: { isPublic: true, deletedAt: null },
       include: propertyInclude,
       orderBy: { createdAt: 'desc' },
     });
@@ -208,7 +264,8 @@ export class PropertiesService {
     const raw = await this.prisma.property.findMany({
       where: {
         isPublic: true,
-        isFeatured: true
+        isFeatured: true,
+        deletedAt: null,
       } as Prisma.PropertyWhereInput,
       include: propertyInclude,
       orderBy: { createdAt: 'desc' },
@@ -219,7 +276,7 @@ export class PropertiesService {
 
   async findOnePublic(id: string) {
     const property = await this.prisma.property.findFirst({
-      where: { id, isPublic: true },
+      where: { id, isPublic: true, deletedAt: null },
       include: propertyInclude,
     });
 
@@ -231,8 +288,8 @@ export class PropertiesService {
   }
 
   async findOne(id: string) {
-    const property = await this.prisma.property.findUnique({
-      where: { id },
+    const property = await this.prisma.property.findFirst({
+      where: { id, deletedAt: null },
       include: propertyInclude,
     });
 
@@ -248,14 +305,12 @@ export class PropertiesService {
     const enqueue = options?.enqueue ?? false;
     const userId = options?.userId ?? '';
 
-    const property = await this.findOne(id);
-
     if (enqueue) {
+      await this.findOne(id);
       const jobId = await this.recommendationQueueService.enqueueRecommendation({
         propertyId: id,
         userId,
         trigger: 'manual',
-        property,
       });
       return {
         propertyId: id,
@@ -265,33 +320,34 @@ export class PropertiesService {
       };
     }
 
-    const recommendedCandidates =
-      await this.propertyRecommendationService.recommendCandidates(property);
-
-    let reconcileResult: any = null;
-    if (persist) {
-      try {
-        reconcileResult = await this.propertyInterestsService.reconcileRecommendations(
-          id,
-          recommendedCandidates,
-        );
-      } catch (error) {
-        reconcileResult = {
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
-    }
-
+    const result = await this.recommendationRunner.run(id, { trigger: 'manual', persist });
     return {
       propertyId: id,
       recommendationQueued: false,
-      recommendedCandidates,
-      reconcile: reconcileResult,
+      status: result.status,
+      recommendedCandidates: result.candidates,
+      reconcile: result.summary ? { summary: result.summary } : null,
+      error: result.error,
+    };
+  }
+
+  lastRecommendationInfo(id: string) {
+    return this.recommendationRunner.lastRecommendationInfo(id);
+  }
+
+  async restoreLastRecommendation(id: string) {
+    const result = await this.recommendationRunner.restoreLast(id);
+    return {
+      propertyId: id,
+      status: result.status,
+      recommendedCandidates: result.candidates,
+      reconcile: result.summary ? { summary: result.summary } : null,
+      error: result.error,
     };
   }
 
   async update(id: string, updatePropertyDto: UpdatePropertyDto, userId: string) {
-    const property = await this.prisma.property.findUnique({ where: { id } });
+    const property = await this.prisma.property.findFirst({ where: { id, deletedAt: null } });
     if (!property) throw new NotFoundException(`Property with ID ${id} not found`);
 
     const { fileIds, documentFileIds, advisorId, cityId, ...propertyData } = updatePropertyDto;
@@ -372,15 +428,16 @@ export class PropertiesService {
 
     let recommendationJobId: string = "";
     let recommendationQueued = false;
-    if (updatedProperty.status === PropertyStatus.Nuevo) {
+    if (this.shouldQueueRecommendation(updatedProperty)) {
       recommendationJobId = await this.recommendationQueueService.enqueueRecommendation({
         propertyId: id,
         userId,
         trigger: 'update',
-        property: updatedProperty,
       });
       recommendationQueued = true;
     }
+
+    this.scheduleAutoDescriptions(id);
 
     const enriched = await this.enrichPropertyFiles(updatedProperty);
     return {
@@ -391,16 +448,15 @@ export class PropertiesService {
     };
   }
 
+  // Soft delete: the row, its files, processes, interests and checklist stay in
+  // the database; the property is just deactivated and hidden from every query.
   async remove(id: string) {
-    const property = await this.prisma.property.findUnique({ where: { id } });
+    const property = await this.prisma.property.findFirst({ where: { id, deletedAt: null } });
     if (!property) throw new NotFoundException(`Property with ID ${id} not found`);
 
-    await this.prisma.propertyFile.deleteMany({
-      where: { propertyId: id }
-    });
-
-    return this.prisma.property.delete({
+    return this.prisma.property.update({
       where: { id },
+      data: { deletedAt: new Date(), isActive: false },
     });
   }
 

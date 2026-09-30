@@ -27,6 +27,8 @@ model User {
   clients    Client[]
   properties Property[]
   notifications Notification[]
+  checkedChecklistItems PropertyChecklistItem[]
+  completedSaleStages   SaleProcessStage[]
 
   @@map("users")
 }
@@ -52,6 +54,8 @@ model Client {
   lastLogin Boolean   @default(false) @map("last_login")
   notes                String?   @map("notes")
   interestDescription  String?   @map("interest_description")
+  /// Lo mantiene un trigger de Postgres: cambia solo cuando cambian interest_description o notes.
+  interestUpdatedAt    DateTime? @map("interest_updated_at")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   user      User?     @relation(fields: [userId], references: [id])
@@ -91,6 +95,11 @@ model Property {
   zone              Zone
   cityTime          Int?           @map("city_time")
   observations      String?
+  publicShortDescription String? @map("public_short_description")
+  publicLongDescription  String? @map("public_long_description")
+  /// Huella de los datos enviados a la IA de recomendaciones y fecha de la última ejecución exitosa.
+  recommendationHash     String?   @map("recommendation_hash")
+  recommendationRunAt    DateTime? @map("recommendation_run_at")
   status            PropertyStatus @default(Validacion)
   advisorId         String         @map("advisor_id") @db.Uuid
   owner             String?
@@ -116,6 +125,8 @@ model Property {
   files                 PropertyFile[]
   processes             Process[]
   interests             PropertyInterest[]
+  checklistItems        PropertyChecklistItem[]
+  saleProcess           SaleProcess?
 
   @@index([code])
   @@index([cityId])
@@ -236,6 +247,74 @@ model ProcessFile {
 
   @@id([processId, fileId])
   @@map("process_files")
+}
+
+model PropertyChecklistItem {
+  id          String      @id @default(uuid()) @db.Uuid
+  propertyId  String      @map("property_id") @db.Uuid
+  side        ProcessType
+  itemKey     String      @map("item_key")
+  checked     Boolean     @default(false)
+  checkedAt   DateTime?   @map("checked_at")
+  checkedById String?     @map("checked_by_id") @db.Uuid
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  property    Property    @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  checkedBy   User?       @relation(fields: [checkedById], references: [id], onDelete: SetNull)
+
+  @@unique([propertyId, side, itemKey])
+  @@map("property_checklist_items")
+}
+
+enum PaymentMethod {
+  Credito
+  Efectivo
+}
+
+enum SaleStage {
+  Sena
+  Cooperativa
+  Municipio
+  Notaria
+  Registro
+}
+
+enum RegistryStatus {
+  Ingreso
+  Devolutiva
+  Inscrita
+}
+
+model SaleProcess {
+  id            String             @id @default(uuid()) @db.Uuid
+  propertyId    String             @unique @map("property_id") @db.Uuid
+  paymentMethod PaymentMethod      @default(Credito) @map("payment_method")
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+  property      Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  stages        SaleProcessStage[]
+
+  @@map("sale_processes")
+}
+
+model SaleProcessStage {
+  id             String          @id @default(uuid()) @db.Uuid
+  saleProcessId  String          @map("sale_process_id") @db.Uuid
+  stage          SaleStage
+  completed      Boolean         @default(false)
+  completedAt    DateTime?       @map("completed_at")
+  completedById  String?         @map("completed_by_id") @db.Uuid
+  observation    String?
+  totalValue     Decimal?        @map("total_value") @db.Decimal(12, 2)
+  depositAmount  Decimal?        @map("deposit_amount") @db.Decimal(12, 2)
+  registryStatus RegistryStatus? @map("registry_status")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  saleProcess    SaleProcess     @relation(fields: [saleProcessId], references: [id], onDelete: Cascade)
+  completedBy    User?           @relation(fields: [completedById], references: [id], onDelete: SetNull)
+
+  @@unique([saleProcessId, stage])
+  @@map("sale_process_stages")
 }
 
 enum ProcessType {

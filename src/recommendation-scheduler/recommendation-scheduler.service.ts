@@ -2,18 +2,9 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { NotificationActionType, PropertyStatus } from '@prisma/client';
-import { PropertiesService } from '../properties/properties.service';
-import { PropertyRecommendationService } from '../properties/property-recommendation.service';
-import { PropertyInterestsService } from '../property-interests/property-interests.service';
+import { NotificationActionType } from '@prisma/client';
+import { RecommendationRunnerService } from '../properties/recommendation-runner.service';
 import { NotificationsService } from '../notifications/notifications.service';
-
-interface PropertyWithAdvisor {
-  id: string;
-  code?: unknown;
-  status?: unknown;
-  advisor?: { id: string; firstName?: string | null; lastName?: string | null } | null;
-}
 
 interface SchedulerCreatedEntry {
   propertyId: string;
@@ -33,6 +24,7 @@ interface SchedulerRunSummary {
   updated: number;
   deleted: number;
   skipped: number;
+  aiCalls: number;
   errors: number;
 }
 
@@ -44,9 +36,7 @@ export class RecommendationSchedulerService implements OnModuleInit {
   constructor(
     private readonly configService: ConfigService,
     private readonly schedulerRegistry: SchedulerRegistry,
-    private readonly propertiesService: PropertiesService,
-    private readonly propertyRecommendationService: PropertyRecommendationService,
-    private readonly propertyInterestsService: PropertyInterestsService,
+    private readonly recommendationRunner: RecommendationRunnerService,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -87,62 +77,70 @@ export class RecommendationSchedulerService implements OnModuleInit {
   async runSync(options?: { propertyId?: string | null }) {
     const onlyPropertyId = options?.propertyId ?? null;
 
-    const properties: PropertyWithAdvisor[] = onlyPropertyId
-      ? [await this.propertiesService.findOne(onlyPropertyId)]
-      : await this.propertiesService.findAll();
+    // Consulta ligera: antes se cargaban todas las propiedades con sus archivos y URLs firmadas.
+    const propertyIds = onlyPropertyId
+      ? [onlyPropertyId]
+      : await this.recommendationRunner.findPropertyIdsToSync();
 
     const summary: SchedulerRunSummary = {
-      total: properties.length,
+      total: propertyIds.length,
       processed: 0,
       candidatesTotal: 0,
       created: 0,
       updated: 0,
       deleted: 0,
       skipped: 0,
+      aiCalls: 0,
       errors: 0,
     };
 
     const withNewRecommendations: SchedulerCreatedEntry[] = [];
 
-    for (const property of properties) {
+    for (const propertyId of propertyIds) {
       try {
-        if (property.status !== PropertyStatus.Nuevo) {
+        // Same flow as saving and the manual button: a failed AI call never
+        // touches the interested-clients list. If neither the property nor any
+        // client changed since the last run, the AI is not called at all.
+        const result = await this.recommendationRunner.run(propertyId, {
+          trigger: 'scheduler',
+        });
+        if (result.status === 'skipped') {
           summary.skipped += 1;
           continue;
         }
+        summary.aiCalls += result.aiCalls ?? 0;
+        summary.candidatesTotal += result.candidates.length;
 
-        const candidates = await this.propertyRecommendationService.recommendCandidates(property);
-        summary.candidatesTotal += candidates.length;
+        if (result.status === 'failed') {
+          summary.errors += 1;
+          this.logger.warn(
+            `Recommender sync skipped property ${result.propertyCode}: ${result.error}`,
+          );
+          continue;
+        }
 
-        const result = await this.propertyInterestsService.reconcileRecommendations(
-          property.id,
-          candidates,
-        );
-        summary.created += result.summary.created;
-        summary.updated += result.summary.updated;
-        summary.deleted += result.summary.deleted;
         summary.processed += 1;
+        const s = result.summary;
+        if (!s) continue;
+        summary.created += s.created;
+        summary.updated += s.updated;
+        summary.deleted += s.deleted;
 
-        if (result.summary.created > 0) {
-          const propertyCode = String(property.code ?? property.id);
-          const advisorId = property.advisor?.id ?? null;
-          const newClientIds =
-            (result.clientChanges?.created ?? []).map((c: any) => c?.clientId).filter(Boolean) as string[];
-
+        if (s.created > 0) {
           withNewRecommendations.push({
-            propertyId: property.id,
-            propertyCode,
-            advisorId,
-            created: result.summary.created,
-            updated: result.summary.updated ?? 0,
-            deleted: result.summary.deleted ?? 0,
-            newClientIds,
+            propertyId,
+            propertyCode: result.propertyCode,
+            advisorId: result.advisorId,
+            created: s.created,
+            updated: s.updated,
+            deleted: s.deleted,
+            newClientIds: [],
           });
         }
       } catch (err) {
         summary.errors += 1;
         this.logger.error(
-          `Recommender sync failed for property ${property.id}: ${
+          `Recommender sync failed for property ${propertyId}: ${
             err instanceof Error ? err.message : String(err)
           }`,
         );

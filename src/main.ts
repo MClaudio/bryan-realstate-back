@@ -40,6 +40,10 @@ async function bootstrap() {
         : ['log', 'error', 'warn', 'debug', 'verbose'],
   });
 
+  // Detrás de nginx: confiar en el primer proxy para que req.ip sea la IP
+  // real del cliente (usada por el rate limit del login). Override con TRUST_PROXY.
+  app.set('trust proxy', parseIntegerMs(process.env.TRUST_PROXY, 1));
+
   // Explicit, generous body-parser limits so reverse proxies + large uploads
   // don't get silently truncated. The real per-file cap lives in the
   // IMPORTANT: only parse JSON & urlencoded bodies when the content-type matches.

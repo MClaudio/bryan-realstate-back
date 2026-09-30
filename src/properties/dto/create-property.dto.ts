@@ -98,6 +98,17 @@ export class CreatePropertyDto {
   @IsOptional()
   observations?: string;
 
+  // Descripciones públicas (lo que se envía/muestra al cliente). Vacío → null.
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? null : value))
+  @IsString()
+  @IsOptional()
+  publicShortDescription?: string | null;
+
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? null : value))
+  @IsString()
+  @IsOptional()
+  publicLongDescription?: string | null;
+
   @IsEnum(PropertyStatus)
   @IsOptional()
   status?: PropertyStatus;

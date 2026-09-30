@@ -9,8 +9,10 @@ import { NotificationActionType } from '@prisma/client';
 import { Job, Queue, Worker } from 'bullmq';
 import type { RedisOptions } from 'ioredis';
 import { NotificationsService } from '../notifications/notifications.service';
-import { PropertyRecommendationService } from './property-recommendation.service';
-import { PropertyInterestsService } from '../property-interests/property-interests.service';
+import {
+  RecommendationRunnerService,
+  describeRecommendationRun,
+} from './recommendation-runner.service';
 
 type RecommendationJobTrigger = 'create' | 'update' | 'manual';
 
@@ -18,7 +20,8 @@ interface RecommendationJobData {
   propertyId: string;
   userId: string;
   trigger: RecommendationJobTrigger;
-  property: unknown;
+  /** Legacy jobs carried a property snapshot; it is ignored (the runner reloads it). */
+  property?: unknown;
 }
 
 const PROPERTY_RECOMMENDATION_QUEUE = 'property-recommendation';
@@ -32,9 +35,8 @@ export class RecommendationQueueService implements OnModuleInit, OnModuleDestroy
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly propertyRecommendationService: PropertyRecommendationService,
+    private readonly recommendationRunner: RecommendationRunnerService,
     private readonly notificationsService: NotificationsService,
-    private readonly propertyInterestsService: PropertyInterestsService,
   ) {}
 
   onModuleInit(): void {
@@ -91,50 +93,11 @@ export class RecommendationQueueService implements OnModuleInit, OnModuleDestroy
   private async processRecommendationJob(
     job: Job<RecommendationJobData>,
   ): Promise<void> {
-    const { property, propertyId, trigger, userId } = job.data;
-    const candidates =
-      await this.propertyRecommendationService.recommendCandidates(property);
-    const propertyCode = String(
-      (property as { code?: unknown } | null)?.code ?? propertyId,
-    );
-
-    let reconcileSummary: { created?: number; updated?: number; deleted?: number } | null = null;
-    try {
-      const reconcile = await this.propertyInterestsService.reconcileRecommendations(
-        propertyId,
-        candidates,
-      );
-      reconcileSummary = reconcile.summary ?? null;
-    } catch (error) {
-      this.logger.error(
-        `Error persisting interests for property ${propertyCode}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
-
-    const hasCandidates = candidates.length > 0;
-    const appliedChanges =
-      reconcileSummary &&
-      (reconcileSummary.created ||
-        reconcileSummary.updated ||
-        reconcileSummary.deleted);
-
-    const reconcileText = reconcileSummary
-      ? ` (${reconcileSummary.created ?? 0} nuevo(s), ${reconcileSummary.updated ?? 0} actualizado(s), ${reconcileSummary.deleted ?? 0} removido(s))`
-      : '';
-
-    const title = appliedChanges
-      ? 'Recomendación IA aplicada'
-      : hasCandidates
-      ? 'Recomendación IA finalizada'
-      : 'Recomendación IA finalizada';
-
-    const message = appliedChanges
-      ? `Se aplicaron automáticamente los interesados para la propiedad ${propertyCode}.${reconcileText}`
-      : hasCandidates
-      ? `Se encontraron ${candidates.length} cliente(s) para la propiedad ${propertyCode} y se actualizó la lista de interesados.`
-      : `No se encontraron clientes nuevos para la propiedad ${propertyCode}.${reconcileText}`;
+    const { propertyId, trigger, userId } = job.data;
+    const result = await this.recommendationRunner.run(propertyId, { trigger });
+    // Sin cambios no se llamó a la IA: no hace falta notificar.
+    if (result.status === 'skipped') return;
+    const { title, message } = describeRecommendationRun(result);
 
     await this.notificationsService.createForUser({
       userId,
@@ -147,8 +110,10 @@ export class RecommendationQueueService implements OnModuleInit, OnModuleDestroy
       payload: {
         propertyId,
         trigger,
-        candidates,
-        reconcile: reconcileSummary,
+        status: result.status,
+        candidates: result.candidates,
+        reconcile: result.summary,
+        error: result.error,
       },
     });
   }

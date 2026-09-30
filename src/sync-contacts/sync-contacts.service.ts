@@ -16,6 +16,20 @@ import {
     splitFullName,
 } from './utils/contact-normalization';
 import { formatPhoneNumber } from '../utils/phoneFormatter';
+import { ContactAiParserService, ParsedContact, RawContactInput } from '../ai/contact-ai-parser.service';
+
+/** Mínimo de dígitos para intentar rescatar con IA un teléfono que libphonenumber no valida. */
+const MIN_DIGITS_FOR_AI_PHONE = 7;
+
+const hasEnoughDigitsForAi = (phone?: string | null) =>
+    (phone ?? '').replace(/\D/g, '').length >= MIN_DIGITS_FOR_AI_PHONE;
+
+interface PendingNewContact {
+    selectedContact: GoogleContactSelectionDto;
+    googleContactId: string | null;
+    normalizedEmail: string | null;
+    formattedPhone: string | null;
+}
 
 interface ExistingClientIndex {
     emails: Set<string>;
@@ -32,6 +46,11 @@ export interface PreviewCandidate {
     email: string | null;
     phone: string | null;
     biography: string | null;
+    phones: string[];
+    emails: string[];
+    birthday: string | null;
+    address: string | null;
+    organization: string | null;
 }
 
 export interface GooglePreviewResponse {
@@ -59,6 +78,7 @@ export class SyncContactsService implements OnModuleInit {
         private readonly exclusionService: ExclusionService,
         private readonly configService: ConfigService,
         private readonly schedulerRegistry: SchedulerRegistry,
+        private readonly contactAiParser: ContactAiParserService,
     ) { }
 
     onModuleInit() {
@@ -226,14 +246,18 @@ export class SyncContactsService implements OnModuleInit {
         let skippedWithoutPhone = 0;
         let skippedDuplicates = 0;
         let skippedExcluded = 0;
+        const aiEnabled = this.contactAiParser.isEnabled();
 
         for (const googleContact of googleContacts) {
             const normalizedEmail = normalizeEmail(googleContact.email);
             const phoneInput = googleContact.phone ?? '';
             const { formatted: formattedPhone, isValid: isValidPhone } = formatPhoneNumber(phoneInput);
             const normalizedPhone = isValidPhone ? normalizePhone(formattedPhone) : null;
+            // Con IA activa, un teléfono no válido pero con suficientes dígitos se intenta rescatar
+            // (solo para contactos nuevos, ver más abajo).
+            const canRescuePhone = aiEnabled && !isValidPhone && hasEnoughDigitsForAi(phoneInput);
 
-            if (!normalizedEmail && !normalizedPhone) {
+            if (!normalizedEmail && !normalizedPhone && !canRescuePhone) {
                 skippedWithoutIdentifier += 1;
                 continue;
             }
@@ -277,7 +301,7 @@ export class SyncContactsService implements OnModuleInit {
                 continue;
             }
 
-            if (!isValidPhone || !normalizedPhone) {
+            if ((!isValidPhone || !normalizedPhone) && !(canRescuePhone && !existsInDb)) {
                 skippedWithoutPhone += 1;
                 continue;
             }
@@ -296,8 +320,13 @@ export class SyncContactsService implements OnModuleInit {
                 lastName,
                 fullName,
                 email: normalizedEmail,
-                phone: formattedPhone,
+                phone: isValidPhone ? formattedPhone : phoneInput,
                 biography: googleContact.biography ?? null,
+                phones: googleContact.phones ?? [],
+                emails: googleContact.emails ?? [],
+                birthday: googleContact.birthday ?? null,
+                address: googleContact.address ?? null,
+                organization: googleContact.organization ?? null,
             });
         }
 
@@ -338,6 +367,11 @@ export class SyncContactsService implements OnModuleInit {
         let duplicatesIgnored = 0;
         let excludedIgnored = 0;
         let invalidIgnored = 0;
+        let aiProcessed = 0;
+        let aiFailed = 0;
+        let googleUpdated = 0;
+        const aiEnabled = this.contactAiParser.isEnabled();
+        const newContacts: PendingNewContact[] = [];
 
         for (const selectedContact of selectedContacts) {
             const normalizedEmail = normalizeEmail(selectedContact.email);
@@ -345,13 +379,14 @@ export class SyncContactsService implements OnModuleInit {
             const { formatted: formattedPhone, isValid: isValidPhone } = formatPhoneNumber(phoneInput);
             const normalizedPhone = isValidPhone ? normalizePhone(formattedPhone) : null;
             const googleContactId = selectedContact.googleContactId?.trim() || null;
+            const canRescuePhone = aiEnabled && !isValidPhone && hasEnoughDigitsForAi(phoneInput);
 
-            if (!normalizedEmail && !normalizedPhone) {
+            if (!normalizedEmail && !normalizedPhone && !canRescuePhone) {
                 invalidIgnored += 1;
                 continue;
             }
 
-            if (!isValidPhone || !normalizedPhone) {
+            if ((!isValidPhone || !normalizedPhone) && !canRescuePhone) {
                 invalidIgnored += 1;
                 continue;
             }
@@ -377,6 +412,12 @@ export class SyncContactsService implements OnModuleInit {
                 (normalizedPhone && existingIndex.phones.has(normalizedPhone));
 
             if (existsInDb) {
+                // Contactos ya sincronizados: sin IA; se requiere teléfono válido como antes.
+                if (!isValidPhone) {
+                    invalidIgnored += 1;
+                    continue;
+                }
+
                 const existingClient = await this.prisma.client.findFirst({
                     where: {
                         OR: [
@@ -422,29 +463,81 @@ export class SyncContactsService implements OnModuleInit {
                 continue;
             }
 
-            const { firstName, lastName } = normalizeNamePair(
-                selectedContact.firstName,
-                selectedContact.lastName,
-                selectedContact.fullName,
-            );
+            newContacts.push({
+                selectedContact,
+                googleContactId,
+                normalizedEmail,
+                formattedPhone: isValidPhone ? formattedPhone : null,
+            });
+        }
+
+        // Solo los contactos nuevos (no presentes en la BD) pasan por la IA.
+        const aiResults = await this.contactAiParser.parseMany(
+            newContacts.map(({ selectedContact }) => this.toRawContactInput(selectedContact)),
+        );
+
+        for (const [index, pending] of newContacts.entries()) {
+            const { googleContactId } = pending;
+            const ai = aiResults[index];
+            if (aiEnabled) {
+                if (ai) aiProcessed += 1;
+                else aiFailed += 1;
+            }
+
+            const data = ai
+                ? this.buildClientDataFromAi(ai, pending)
+                : this.buildClientDataFallback(pending);
+
+            if (!data.phone) {
+                invalidIgnored += 1;
+                continue;
+            }
+
+            // Re-chequeo de duplicados con los datos ya normalizados (también evita duplicados dentro del lote).
+            const normalizedPhone = normalizePhone(data.phone);
+            if (
+                (googleContactId && existingIndex.googleIds.has(googleContactId)) ||
+                (data.email && existingIndex.emails.has(data.email)) ||
+                (normalizedPhone && existingIndex.phones.has(normalizedPhone))
+            ) {
+                duplicatesIgnored += 1;
+                continue;
+            }
 
             await this.prisma.client.create({
                 data: {
-                    firstName,
-                    lastName,
-                    email: normalizedEmail,
-                    phone: formattedPhone,
+                    ...data,
+                    phone: data.phone,
+                    birthDate: data.birthDate ? new Date(data.birthDate) : null,
                     googleContactId,
                     googleSyncedAt: new Date(),
-                    interestDescription: selectedContact.biography?.trim() || null,
                 },
             });
 
             imported += 1;
 
             if (googleContactId) existingIndex.googleIds.add(googleContactId);
-            if (normalizedEmail) existingIndex.emails.add(normalizedEmail);
+            if (data.email) existingIndex.emails.add(data.email);
             if (normalizedPhone) existingIndex.phones.add(normalizedPhone);
+
+            // Reescribir el contacto en Google con los datos formateados por la IA.
+            if (ai && googleContactId) {
+                try {
+                    await this.googleContactsService.updateContact(googleContactId, {
+                        firstName: data.firstName,
+                        lastName: data.lastName,
+                        email: data.email,
+                        phone: data.phone,
+                        biography: data.interestDescription,
+                        birthday: data.birthDate ?? undefined,
+                        address: data.address ?? undefined,
+                    });
+                    googleUpdated += 1;
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Unknown error';
+                    this.logger.error(`No se pudo actualizar en Google el contacto ${googleContactId}: ${message}`);
+                }
+            }
         }
 
         await this.prisma.contactSyncLog.create({
@@ -458,6 +551,9 @@ export class SyncContactsService implements OnModuleInit {
                     selectedCount: selectedContacts.length,
                     excludedCount: excludedContacts.length,
                     forceSync,
+                    aiProcessed,
+                    aiFailed,
+                    googleUpdated,
                 },
             },
         });
@@ -468,6 +564,59 @@ export class SyncContactsService implements OnModuleInit {
             excludedIgnored,
             invalidIgnored,
             exclusionsStored: exclusionResult.stored,
+            aiProcessed,
+            aiFailed,
+            googleUpdated,
+        };
+    }
+
+    private toRawContactInput(contact: GoogleContactSelectionDto): RawContactInput {
+        const unique = (values: Array<string | undefined>) =>
+            values.filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index);
+
+        return {
+            givenName: contact.firstName ?? null,
+            familyName: contact.lastName ?? null,
+            displayName: contact.fullName ?? null,
+            phones: unique([contact.phone, ...(contact.phones ?? [])]),
+            emails: unique([contact.email, ...(contact.emails ?? [])]),
+            birthday: contact.birthday ?? null,
+            address: contact.address ?? null,
+            organization: contact.organization ?? null,
+            biography: contact.biography ?? null,
+        };
+    }
+
+    private buildClientDataFromAi(ai: ParsedContact, pending: PendingNewContact) {
+        return {
+            firstName: ai.firstName,
+            lastName: ai.lastName,
+            email: ai.email ?? pending.normalizedEmail,
+            phone: ai.phone ?? pending.formattedPhone,
+            birthDate: ai.birthDate,
+            address: ai.address,
+            notes: ai.notes,
+            interestDescription: ai.interestDescription,
+        };
+    }
+
+    private buildClientDataFallback(pending: PendingNewContact) {
+        const { selectedContact } = pending;
+        const { firstName, lastName } = normalizeNamePair(
+            selectedContact.firstName,
+            selectedContact.lastName,
+            selectedContact.fullName,
+        );
+
+        return {
+            firstName,
+            lastName,
+            email: pending.normalizedEmail,
+            phone: pending.formattedPhone,
+            birthDate: null as string | null,
+            address: null as string | null,
+            notes: null as string | null,
+            interestDescription: selectedContact.biography?.trim() || null,
         };
     }
 
@@ -537,6 +686,11 @@ export class SyncContactsService implements OnModuleInit {
                 email: contact.email ?? undefined,
                 phone: contact.phone ?? undefined,
                 biography: contact.biography ?? undefined,
+                phones: contact.phones,
+                emails: contact.emails,
+                birthday: contact.birthday ?? undefined,
+                address: contact.address ?? undefined,
+                organization: contact.organization ?? undefined,
             }));
             const result = await this.syncGoogleToDb({
                 selectedContacts,
