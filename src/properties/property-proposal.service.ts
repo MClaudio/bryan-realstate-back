@@ -190,7 +190,7 @@ export class PropertyProposalService {
       {
         label: 'Años de construcción',
         value:
-          property.constructionYears != null
+          Number(property.constructionYears) > 0
             ? String(property.constructionYears)
             : '',
       },
@@ -201,7 +201,8 @@ export class PropertyProposalService {
       { label: 'Topografía', value: String(property.topography ?? '') },
       {
         label: 'Tiempo a la ciudad',
-        value: property.cityTime != null ? `${property.cityTime} minutos` : '',
+        value:
+          Number(property.cityTime) > 0 ? `${property.cityTime} minutos` : '',
       },
     ].filter((row) => row.value);
 
@@ -217,10 +218,11 @@ export class PropertyProposalService {
         value: money(price / constructionArea, 2),
       });
     }
-    if (landArea > 0 && constructionArea > 0) {
+    const freeLand = landArea - constructionArea;
+    if (constructionArea > 0 && freeLand > 0) {
       indicators.push({
         label: 'Área libre de terreno',
-        value: area(Math.max(landArea - constructionArea, 0)),
+        value: area(freeLand),
       });
     }
 
