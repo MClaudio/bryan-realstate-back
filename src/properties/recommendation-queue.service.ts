@@ -27,6 +27,10 @@ interface RecommendationJobData {
 const PROPERTY_RECOMMENDATION_QUEUE = 'property-recommendation';
 const PROPERTY_RECOMMENDATION_JOB = 'run';
 
+/** Job states that mean "a recommendation is still going to run / running". */
+const PENDING_STATES = ['active', 'waiting', 'delayed', 'prioritized', 'waiting-children'] as const;
+type PendingState = (typeof PENDING_STATES)[number];
+
 @Injectable()
 export class RecommendationQueueService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RecommendationQueueService.name);
@@ -88,6 +92,44 @@ export class RecommendationQueueService implements OnModuleInit, OnModuleDestroy
   async enqueueRecommendation(input: RecommendationJobData): Promise<string> {
     const job = await this.queue.add(PROPERTY_RECOMMENDATION_JOB, input);
     return String(job.id);
+  }
+
+  /**
+   * Manual run in the background. If a job for the same property is already
+   * waiting or running (manual or triggered by a save), no new one is created.
+   */
+  async enqueueManualRecommendation(
+    propertyId: string,
+    userId: string,
+  ): Promise<{ jobId: string; alreadyRunning: boolean }> {
+    const pending = await this.findPendingJob(propertyId);
+    if (pending) return { jobId: String(pending.id), alreadyRunning: true };
+
+    // Fixed id so two simultaneous clicks can't create two jobs; a finished job
+    // kept by removeOnComplete/removeOnFail would block the id, so drop it first.
+    const jobId = `manual-${propertyId}`;
+    const previous = await this.queue.getJob(jobId);
+    if (previous) {
+      const state = await previous.getState();
+      if (PENDING_STATES.includes(state as PendingState)) {
+        return { jobId, alreadyRunning: true };
+      }
+      await previous.remove();
+    }
+
+    await this.queue.add(
+      PROPERTY_RECOMMENDATION_JOB,
+      { propertyId, userId, trigger: 'manual' },
+      { jobId },
+    );
+    return { jobId, alreadyRunning: false };
+  }
+
+  private async findPendingJob(
+    propertyId: string,
+  ): Promise<Job<RecommendationJobData> | undefined> {
+    const jobs = await this.queue.getJobs([...PENDING_STATES]);
+    return jobs.find((job) => job?.data?.propertyId === propertyId);
   }
 
   private async processRecommendationJob(
