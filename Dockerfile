@@ -15,10 +15,13 @@ RUN DATABASE_URL="postgresql://x:x@localhost:5432/x" npx prisma generate
 COPY src ./src/
 RUN npm run build
 
-# Deja solo las dependencias de producción (con el cliente Prisma ya generado)
-RUN npm prune --omit=dev
+# Nota: no se hace "npm prune --omit=dev" porque "prisma" (el CLI) y "dotenv"
+# son devDependencies pero se necesitan en runtime: el CMD ejecuta
+# "npx prisma migrate deploy" al arrancar el contenedor, y prisma.config.ts
+# hace `import "dotenv/config"`. Sin ellas, prisma.config.ts no carga bien
+# y datasource.url queda undefined aunque DATABASE_URL esté seteada.
 
-# ---- Etapa 2: runtime (imagen final, liviana, sin devDependencies) ----
+# ---- Etapa 2: runtime (imagen final) ----
 FROM node:20-alpine AS runtime
 
 WORKDIR /app
@@ -27,6 +30,7 @@ ENV NODE_ENV=production
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./
 COPY package.json ./
 
 EXPOSE 3000

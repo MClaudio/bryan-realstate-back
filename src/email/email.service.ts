@@ -69,9 +69,18 @@ export class EmailService {
     }
   }
 
+  private getFrontendBaseUrl(): string {
+    const explicit =
+      this.configService.get<string>('FRONT_URL') ||
+      this.configService.get<string>('FRONTEND_URL') ||
+      '';
+    const fallback = 'http://localhost:5173';
+    const raw = (explicit.trim().length > 0 ? explicit : fallback).trim();
+    return raw.replace(/\/+$/, '');
+  }
+
   async sendResetPasswordEmail(to: string, resetToken: string, userName: string): Promise<void> {
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:5173';
-    const baseUrl = frontendUrl.replace(/\/$/, '');
+    const baseUrl = this.getFrontendBaseUrl();
     const resetUrl = `${baseUrl}/admin/reset-password?token=${resetToken}`;
     
     const subject = 'Recuperación de Contraseña - Bryan RealState';

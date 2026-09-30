@@ -13,7 +13,16 @@ export interface GoogleContactPayload {
   email?: string | null;
   phone?: string | null;
   biography?: string | null;
+  /** Todos los teléfonos/emails del contacto (el primero coincide con phone/email). */
+  phones?: string[];
+  emails?: string[];
+  /** YYYY-MM-DD (o --MM-DD si Google no tiene año). */
+  birthday?: string | null;
+  address?: string | null;
+  organization?: string | null;
 }
+
+const PERSON_FIELDS = 'names,emailAddresses,phoneNumbers,biographies,birthdays,addresses,organizations,metadata';
 
 @Injectable()
 export class GoogleContactsService {
@@ -57,6 +66,32 @@ export class GoogleContactsService {
     };
   }
 
+  async getTokenStatus() {
+    const token = await this.prisma.googleAuthToken.findUnique({
+      where: { provider: 'google' },
+    });
+
+    if (!token) {
+      return {
+        connected: false,
+        needsReauth: false,
+        hasRefreshToken: false,
+        expiresAt: null,
+        lastRefreshAt: null,
+        lastError: null,
+      };
+    }
+
+    return {
+      connected: !token.needsReauth,
+      needsReauth: token.needsReauth,
+      hasRefreshToken: Boolean(token.refreshToken),
+      expiresAt: token.expiryDate ? token.expiryDate.toISOString() : null,
+      lastRefreshAt: token.lastRefreshAt ? token.lastRefreshAt.toISOString() : null,
+      lastError: token.lastError,
+    };
+  }
+
   async listAllContacts(): Promise<GoogleContactPayload[]> {
     const people = await this.getPeopleClient();
     const contacts: GoogleContactPayload[] = [];
@@ -66,7 +101,7 @@ export class GoogleContactsService {
       const response = await this.withRetry(() =>
         people.people.connections.list({
           resourceName: 'people/me',
-          personFields: 'names,emailAddresses,phoneNumbers,biographies,metadata',
+          personFields: PERSON_FIELDS,
           pageSize: 1000,
           pageToken,
           sortOrder: 'FIRST_NAME_ASCENDING',
@@ -99,7 +134,7 @@ export class GoogleContactsService {
       const response = await this.withRetry(() =>
         people.people.searchContacts({
           query,
-          readMask: 'names,emailAddresses,phoneNumbers,biographies,metadata',
+          readMask: PERSON_FIELDS,
           pageSize: 30,
         }),
       );
@@ -170,7 +205,7 @@ export class GoogleContactsService {
     const current = await this.withRetry(() =>
       people.people.get({
         resourceName: googleContactId,
-        personFields: 'names,emailAddresses,phoneNumbers,biographies,metadata',
+        personFields: PERSON_FIELDS,
       }),
     );
 
@@ -186,23 +221,40 @@ export class GoogleContactsService {
         })()
       : null;
 
+    const updatePersonFields = ['names', 'emailAddresses', 'phoneNumbers', 'biographies'];
+    const requestBody: people_v1.Schema$Person = {
+      etag,
+      names: [
+        {
+          givenName: firstName,
+          familyName: lastName,
+          displayName: `${firstName} ${lastName}`.trim(),
+        },
+      ],
+      emailAddresses: email ? [{ value: email }] : [],
+      phoneNumbers: phone ? [{ value: phone }] : [],
+      biographies: contact.biography ? [{ value: contact.biography, contentType: 'TEXT_PLAIN' }] : [],
+    };
+
+    // Cumpleaños y dirección solo se tocan si se envían explícitamente,
+    // para no borrarlos desde flujos que no los manejan.
+    if (contact.birthday !== undefined) {
+      const date = this.toGoogleDate(contact.birthday);
+      updatePersonFields.push('birthdays');
+      requestBody.birthdays = date ? [{ date }] : [];
+    }
+    if (contact.address !== undefined) {
+      updatePersonFields.push('addresses');
+      requestBody.addresses = contact.address?.trim()
+        ? [{ formattedValue: contact.address.trim(), streetAddress: contact.address.trim() }]
+        : [];
+    }
+
     const updated = await this.withRetry(() =>
       people.people.updateContact({
         resourceName: googleContactId,
-        updatePersonFields: 'names,emailAddresses,phoneNumbers,biographies',
-        requestBody: {
-          etag,
-          names: [
-            {
-              givenName: firstName,
-              familyName: lastName,
-              displayName: `${firstName} ${lastName}`.trim(),
-            },
-          ],
-          emailAddresses: email ? [{ value: email }] : [],
-          phoneNumbers: phone ? [{ value: phone }] : [],
-          biographies: contact.biography ? [{ value: contact.biography, contentType: 'TEXT_PLAIN' }] : [],
-        },
+        updatePersonFields: updatePersonFields.join(','),
+        requestBody,
       }),
     );
 
@@ -228,6 +280,16 @@ export class GoogleContactsService {
     return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
   }
 
+  /**
+   * Fuerza una obtención/renovación de access token, manteniendo vivo el
+   * refresh_token cuando el sistema está inactivo (Google los invalida tras ~6 meses sin uso).
+   */
+  async ensureFreshToken(): Promise<{ expiresAt: string | null }> {
+    const oauthClient = await this.getAuthorizedClient();
+    const expiryDate = oauthClient.credentials.expiry_date;
+    return { expiresAt: expiryDate ? new Date(expiryDate).toISOString() : null };
+  }
+
   private async getAuthorizedClient(): Promise<InstanceType<typeof google.auth.OAuth2>> {
     const oauthClient = this.createOAuthClient();
     const token = await this.prisma.googleAuthToken.findUnique({
@@ -236,6 +298,12 @@ export class GoogleContactsService {
 
     if (!token) {
       throw new BadRequestException('Google no está conectado. Autoriza la aplicación primero.');
+    }
+
+    if (token.needsReauth) {
+      throw new BadRequestException(
+        'La autorización de Google expiró o fue revocada. Vuelve a conectar Google Contacts.',
+      );
     }
 
     oauthClient.setCredentials({
@@ -252,12 +320,17 @@ export class GoogleContactsService {
       });
     });
 
-    const isExpired = token.expiryDate ? token.expiryDate.getTime() <= Date.now() : false;
+    const REFRESH_MARGIN_MS = 5 * 60_000;
+    const isExpired = token.expiryDate
+      ? token.expiryDate.getTime() <= Date.now() + REFRESH_MARGIN_MS
+      : true;
+
     if (isExpired && token.refreshToken) {
       try {
-        const { credentials } = await oauthClient.refreshAccessToken();
-        await this.persistTokens(credentials);
-        oauthClient.setCredentials(credentials);
+        const accessTokenResponse = await oauthClient.getAccessToken();
+        if (!accessTokenResponse.token) {
+          throw new BadRequestException('Google no devolvió un access_token al renovar');
+        }
       } catch (error) {
         if (await this.handleInvalidGrantError(error)) {
           throw new BadRequestException(
@@ -290,6 +363,9 @@ export class GoogleContactsService {
         tokenType: tokens.token_type ?? null,
         scope: tokens.scope ?? null,
         expiryDate: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+        needsReauth: false,
+        lastError: null,
+        lastRefreshAt: new Date(),
       },
       update: {
         accessToken,
@@ -297,6 +373,9 @@ export class GoogleContactsService {
         tokenType: tokens.token_type ?? existing?.tokenType ?? null,
         scope: tokens.scope ?? existing?.scope ?? null,
         expiryDate: tokens.expiry_date ? new Date(tokens.expiry_date) : existing?.expiryDate ?? null,
+        needsReauth: false,
+        lastError: null,
+        lastRefreshAt: new Date(),
       },
     });
   }
@@ -306,7 +385,15 @@ export class GoogleContactsService {
     const lastName = person.names?.[0]?.familyName ?? null;
     const fullName =
       person.names?.[0]?.displayName ?? (`${firstName ?? ''} ${lastName ?? ''}`.trim() || null);
-    const rawPhone = person.phoneNumbers?.[0]?.value?.trim() || null;
+    const phones = (person.phoneNumbers ?? [])
+      .map((item) => item.value?.trim())
+      .filter((value): value is string => Boolean(value));
+    const emails = (person.emailAddresses ?? [])
+      .map((item) => normalizeEmail(item.value ?? null))
+      .filter((value): value is string => Boolean(value));
+    const rawPhone = phones[0] ?? null;
+    const birthdayDate = person.birthdays?.find((b) => b.date)?.date;
+    const address = person.addresses?.[0];
 
     return {
       googleContactId: person.resourceName ?? null,
@@ -318,7 +405,31 @@ export class GoogleContactsService {
       // so cron can apply formatPhoneNumber consistently without losing country info.
       phone: rawPhone,
       biography: person.biographies?.[0]?.value?.trim() || null,
+      phones,
+      emails,
+      birthday: birthdayDate ? this.fromGoogleDate(birthdayDate) : person.birthdays?.[0]?.text?.trim() || null,
+      address:
+        address?.formattedValue?.trim() ||
+        [address?.streetAddress, address?.city, address?.region, address?.country]
+          .filter(Boolean)
+          .join(', ') ||
+        null,
+      organization:
+        [person.organizations?.[0]?.name, person.organizations?.[0]?.title].filter(Boolean).join(' - ') || null,
     };
+  }
+
+  private fromGoogleDate(date: people_v1.Schema$Date): string | null {
+    if (!date.month || !date.day) return null;
+    const mm = String(date.month).padStart(2, '0');
+    const dd = String(date.day).padStart(2, '0');
+    return date.year ? `${date.year}-${mm}-${dd}` : `--${mm}-${dd}`;
+  }
+
+  private toGoogleDate(value?: string | null): people_v1.Schema$Date | null {
+    const match = value?.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return null;
+    return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
   }
 
   private async withRetry<T>(callback: () => Promise<T>, maxAttempts = 3): Promise<T> {
@@ -372,8 +483,14 @@ export class GoogleContactsService {
       return false;
     }
 
-    this.logger.warn('Google OAuth devolvió invalid_grant. Se limpiará el token local para requerir reconexión.');
-    await this.prisma.googleAuthToken.deleteMany({ where: { provider: 'google' } });
+    this.logger.error('Google OAuth devolvió invalid_grant. Se requiere reconectar la cuenta de Google.');
+    await this.prisma.googleAuthToken.updateMany({
+      where: { provider: 'google' },
+      data: {
+        needsReauth: true,
+        lastError: gaxiosError.response?.data?.error_description ?? gaxiosError.message ?? 'invalid_grant',
+      },
+    });
     return true;
   }
 }

@@ -1,25 +1,33 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+﻿import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateConfigurationDto } from './dto/create-configuration.dto';
 import { UpdateConfigurationDto } from './dto/update-configuration.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { FilesService } from '../files/files.service';
 
 @Injectable()
 export class ConfigurationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly filesService: FilesService,
+  ) {}
+
+  private async enrichLogo(config: any): Promise<any> {
+    if (config?.logo) {
+      return { ...config, logo: await this.filesService.enrichFile(config.logo) };
+    }
+    return config;
+  }
 
   async create(createConfigurationDto: CreateConfigurationDto) {
     const existingConfig = await this.prisma.configuration.findFirst();
     if (existingConfig) {
-      // If one exists, we should probably update it or return it, 
-      // but for now, let's allow creating if none exists, or fail.
-      // Or maybe we treat this as "Upsert" logic in the controller/service.
-      // Let's assume we can have only one config.
       throw new Error('Configuration already exists. Use update instead.');
     }
-
-    return this.prisma.configuration.create({
+    const raw = await this.prisma.configuration.create({
       data: createConfigurationDto,
+      include: { logo: true },
     });
+    return this.enrichLogo(raw);
   }
 
   async findOne() {
@@ -28,22 +36,25 @@ export class ConfigurationsService {
         logo: true,
       },
     });
-    return config;
+    return this.enrichLogo(config);
   }
 
   async update(updateConfigurationDto: UpdateConfigurationDto) {
     const existingConfig = await this.prisma.configuration.findFirst();
     
     if (!existingConfig) {
-       // If no config exists, create it
-       return this.prisma.configuration.create({
+       const created = await this.prisma.configuration.create({
          data: updateConfigurationDto as CreateConfigurationDto,
+         include: { logo: true },
        });
+       return this.enrichLogo(created);
     }
 
-    return this.prisma.configuration.update({
+    const updated = await this.prisma.configuration.update({
       where: { id: existingConfig.id },
       data: updateConfigurationDto,
+      include: { logo: true },
     });
+    return this.enrichLogo(updated);
   }
 }
