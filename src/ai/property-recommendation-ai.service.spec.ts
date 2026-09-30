@@ -97,6 +97,46 @@ describe('PropertyRecommendationAiService', () => {
     expect(result).toMatchObject({ ok: false, reason: 'unparseable' });
   });
 
+  it('si la respuesta se corta por tokens, divide el lote en dos y reintenta', async () => {
+    const service = new PropertyRecommendationAiService(buildConfig());
+    const truncated = { choices: [{ finish_reason: 'length', message: { content: '{"c":[{"id":"a","l":"AL' } }] };
+    const create = mockCreate(
+      service,
+      jest
+        .fn()
+        .mockResolvedValueOnce(truncated)
+        .mockResolvedValueOnce(reply([{ id: 'a', l: 'ALTO', s: 90, r: 'Terreno en Gualaceo' }]))
+        .mockResolvedValueOnce(reply([{ id: 'c', l: 'MEDIO', s: 75, r: 'Terreno grande' }])),
+    );
+
+    const result = await service.recommend(property, clients);
+
+    expect(create).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(create.mock.calls[1][0].messages[1].content).clientes.map((c: { id: string }) => c.id)).toEqual(['a', 'b']);
+    expect(JSON.parse(create.mock.calls[2][0].messages[1].content).clientes.map((c: { id: string }) => c.id)).toEqual(['c']);
+    expect(result).toEqual({
+      ok: true,
+      calls: 3,
+      matches: [
+        { client_id: 'a', interest_level: 'ALTO', reason: 'Terreno en Gualaceo', score: 90 },
+        { client_id: 'c', interest_level: 'MEDIO', reason: 'Terreno grande', score: 75 },
+      ],
+    });
+  });
+
+  it('falla indicando el motivo si un lote de un solo cliente sigue truncado', async () => {
+    const service = new PropertyRecommendationAiService(buildConfig());
+    mockCreate(
+      service,
+      jest.fn().mockResolvedValue({ choices: [{ finish_reason: 'length', message: { content: '{"c":[' } }] }),
+    );
+
+    const result = await service.recommend(property, [clients[0]]);
+
+    expect(result).toMatchObject({ ok: false, reason: 'unparseable' });
+    expect(!result.ok && result.detail).toContain('finish_reason=length');
+  });
+
   it('detecta falta de crédito y pausa la IA', async () => {
     const service = new PropertyRecommendationAiService(buildConfig());
     const create = mockCreate(

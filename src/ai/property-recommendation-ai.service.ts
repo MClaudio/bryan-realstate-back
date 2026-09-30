@@ -22,11 +22,23 @@ export interface AiRecommendationMatch {
   score: number;
 }
 
-export type AiRecommendationFailure = 'disabled' | 'no_credit' | 'timeout' | 'network' | 'http' | 'unparseable';
+export type AiRecommendationFailure =
+  | 'disabled'
+  | 'no_credit'
+  | 'timeout'
+  | 'network'
+  | 'http'
+  | 'unparseable';
 
 export type AiRecommendationResult =
   | { ok: true; matches: AiRecommendationMatch[]; calls: number }
   | { ok: false; reason: AiRecommendationFailure; detail: string };
+
+interface CompletionResult {
+  output: unknown;
+  finishReason: string | null;
+  refusal: string | null;
+}
 
 const LEVELS: AiInterestLevel[] = ['ALTO', 'MEDIO', 'BAJO'];
 const MAX_REASON_LENGTH = 300;
@@ -51,12 +63,17 @@ export class PropertyRecommendationAiService {
     return this.config.recommendation.enabled && Date.now() >= this.pausedUntil;
   }
 
-  getUnavailableReason(): { reason: AiRecommendationFailure; detail: string } | null {
-    if (!this.config.apiKey) return { reason: 'disabled', detail: 'falta OPENAI_API_KEY' };
+  getUnavailableReason(): {
+    reason: AiRecommendationFailure;
+    detail: string;
+  } | null {
+    if (!this.config.apiKey)
+      return { reason: 'disabled', detail: 'falta OPENAI_API_KEY' };
     if (!this.config.recommendation.enabled) {
       return { reason: 'disabled', detail: 'AI_RECOMMENDATION_ENABLED=false' };
     }
-    if (Date.now() < this.pausedUntil) return { reason: 'no_credit', detail: 'OpenAI sin crédito (pausado)' };
+    if (Date.now() < this.pausedUntil)
+      return { reason: 'no_credit', detail: 'OpenAI sin crédito (pausado)' };
     return null;
   }
 
@@ -72,22 +89,42 @@ export class PropertyRecommendationAiService {
     const best = new Map<string, AiRecommendationMatch>();
     let calls = 0;
 
-    // Lotes secuenciales: si uno falla, falla todo (no se guarda la huella y se reintenta después).
+    const queue: AiRecommendationClient[][] = [];
     for (let start = 0; start < clients.length; start += batchSize) {
-      const batch = clients.slice(start, start + batchSize);
+      queue.push(clients.slice(start, start + batchSize));
+    }
+
+    // Lotes secuenciales: si uno falla, falla todo (no se guarda la huella y se reintenta después).
+    while (queue.length > 0) {
+      const batch = queue.shift()!;
       const allowedIds = new Set(batch.map((c) => c.id));
 
-      let output: unknown;
+      let response: CompletionResult;
       try {
-        output = await this.requestCompletion(property, batch);
+        response = await this.requestCompletion(property, batch);
         calls += 1;
       } catch (error) {
         return this.toFailure(error);
       }
 
-      const matches = this.validate(output, allowedIds, minScore);
+      // Respuesta cortada por el límite de tokens (muchas coincidencias en el lote):
+      // se reintenta el lote dividido en dos en vez de fallar.
+      if (response.finishReason === 'length' && batch.length > 1) {
+        const half = Math.ceil(batch.length / 2);
+        this.logger.warn(
+          `Recomendación IA: respuesta truncada por max_completion_tokens con ${batch.length} cliente(s); se reintenta en 2 lotes de ${half} y ${batch.length - half}`,
+        );
+        queue.unshift(batch.slice(0, half), batch.slice(half));
+        continue;
+      }
+
+      const matches = this.validate(response.output, allowedIds, minScore);
       if (!matches) {
-        return { ok: false, reason: 'unparseable', detail: 'respuesta de la IA sin el formato esperado' };
+        const detail = response.refusal
+          ? `la IA rechazó la solicitud: ${response.refusal}`
+          : `respuesta de la IA sin el formato esperado (finish_reason=${response.finishReason ?? '?'})`;
+        this.logger.warn(`Recomendación IA no interpretable: ${detail}`);
+        return { ok: false, reason: 'unparseable', detail };
       }
       for (const match of matches) {
         const prev = best.get(match.client_id);
@@ -103,7 +140,11 @@ export class PropertyRecommendationAiService {
   }
 
   /** Filtra ids no enviados (inventados), puntajes bajo el umbral y normaliza campos. */
-  validate(output: unknown, allowedIds: Set<string>, minScore: number): AiRecommendationMatch[] | null {
+  validate(
+    output: unknown,
+    allowedIds: Set<string>,
+    minScore: number,
+  ): AiRecommendationMatch[] | null {
     const list = (output as { c?: unknown } | null)?.c;
     if (!Array.isArray(list)) return null;
 
@@ -120,7 +161,10 @@ export class PropertyRecommendationAiService {
       if (!Number.isFinite(score) || score < minScore) continue;
 
       const level = String(raw.l ?? '').toUpperCase() as AiInterestLevel;
-      const reason = typeof raw.r === 'string' ? raw.r.replace(/\s+/g, ' ').trim().slice(0, MAX_REASON_LENGTH) : '';
+      const reason =
+        typeof raw.r === 'string'
+          ? raw.r.replace(/\s+/g, ' ').trim().slice(0, MAX_REASON_LENGTH)
+          : '';
       if (!reason) continue;
 
       matches.push({
@@ -130,7 +174,10 @@ export class PropertyRecommendationAiService {
         score,
       });
     }
-    if (invented > 0) this.logger.warn(`Recomendación IA: ${invented} id(s) no enviados fueron descartados`);
+    if (invented > 0)
+      this.logger.warn(
+        `Recomendación IA: ${invented} id(s) no enviados fueron descartados`,
+      );
     return matches;
   }
 
@@ -148,7 +195,7 @@ export class PropertyRecommendationAiService {
   private async requestCompletion(
     property: Record<string, unknown>,
     clients: AiRecommendationClient[],
-  ): Promise<unknown> {
+  ): Promise<CompletionResult> {
     const { model, temperature, maxOutputTokens } = this.config.recommendation;
     const completion = await this.getClient().chat.completions.create({
       model,
@@ -156,11 +203,15 @@ export class PropertyRecommendationAiService {
       max_completion_tokens: maxOutputTokens,
       response_format: {
         type: 'json_schema',
-        json_schema: PROPERTY_RECOMMENDATION_SCHEMA as unknown as OpenAI.ResponseFormatJSONSchema['json_schema'],
+        json_schema:
+          PROPERTY_RECOMMENDATION_SCHEMA as unknown as OpenAI.ResponseFormatJSONSchema['json_schema'],
       },
       messages: [
         { role: 'system', content: PROPERTY_RECOMMENDATION_SYSTEM_PROMPT },
-        { role: 'user', content: JSON.stringify({ propiedad: property, clientes: clients }) },
+        {
+          role: 'user',
+          content: JSON.stringify({ propiedad: property, clientes: clients }),
+        },
       ],
     });
 
@@ -172,29 +223,52 @@ export class PropertyRecommendationAiService {
       );
     }
 
-    const content = completion.choices[0]?.message?.content;
-    if (!content) return null;
+    const choice = completion.choices[0];
+    const result: CompletionResult = {
+      output: null,
+      finishReason: choice?.finish_reason ?? null,
+      refusal: choice?.message?.refusal ?? null,
+    };
+    const content = choice?.message?.content;
+    if (!content) return result;
     try {
-      return JSON.parse(content);
+      result.output = JSON.parse(content);
     } catch {
-      return null;
+      /* truncated or malformed JSON: output stays null */
     }
+    return result;
   }
 
   private toFailure(error: unknown): AiRecommendationResult {
-    const err = (error ?? {}) as { code?: string | null; type?: string | null; status?: number; name?: string };
+    const err = (error ?? {}) as {
+      code?: string | null;
+      type?: string | null;
+      status?: number;
+      name?: string;
+    };
     const detail = error instanceof Error ? error.message : String(error);
     this.logger.warn(`Recomendación IA falló: ${detail}`);
 
-    if (err.type === 'insufficient_quota' || err.code === 'insufficient_quota' || err.code === 'credit_balance_exhausted') {
-      this.pausedUntil = Date.now() + PropertyRecommendationAiService.QUOTA_PAUSE_MS;
-      this.logger.error('OpenAI sin crédito: recomendaciones IA pausadas por 10 minutos');
+    if (
+      err.type === 'insufficient_quota' ||
+      err.code === 'insufficient_quota' ||
+      err.code === 'credit_balance_exhausted'
+    ) {
+      this.pausedUntil =
+        Date.now() + PropertyRecommendationAiService.QUOTA_PAUSE_MS;
+      this.logger.error(
+        'OpenAI sin crédito: recomendaciones IA pausadas por 10 minutos',
+      );
       return { ok: false, reason: 'no_credit', detail };
     }
-    if (err.name === 'APIConnectionTimeoutError' || /timed? ?out/i.test(detail)) {
+    if (
+      err.name === 'APIConnectionTimeoutError' ||
+      /timed? ?out/i.test(detail)
+    ) {
       return { ok: false, reason: 'timeout', detail };
     }
-    if (typeof err.status === 'number') return { ok: false, reason: 'http', detail };
+    if (typeof err.status === 'number')
+      return { ok: false, reason: 'http', detail };
     return { ok: false, reason: 'network', detail };
   }
 }
