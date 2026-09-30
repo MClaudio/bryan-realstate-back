@@ -307,14 +307,12 @@ export class PropertiesService {
 
     if (enqueue) {
       await this.findOne(id);
-      const jobId = await this.recommendationQueueService.enqueueRecommendation({
-        propertyId: id,
-        userId,
-        trigger: 'manual',
-      });
+      const { jobId, alreadyRunning } =
+        await this.recommendationQueueService.enqueueManualRecommendation(id, userId);
       return {
         propertyId: id,
-        recommendationQueued: true,
+        recommendationQueued: !alreadyRunning,
+        recommendationAlreadyRunning: alreadyRunning,
         recommendationJobId: jobId,
         recommendedCandidates: [],
       };

@@ -40,7 +40,8 @@ export class PropertiesController {
     @Req() req: any,
     @Body() body?: { enqueue?: boolean; persist?: boolean },
   ) {
-    const enqueue = Boolean(body?.enqueue);
+    // Background by default: a synchronous run with many clients outlasts the HTTP timeout.
+    const enqueue = body?.enqueue !== false;
     const persist = body?.persist === false ? false : true;
     const userId = this.getUserId(req);
     return this.propertiesService.recommendForProperty(id, {
