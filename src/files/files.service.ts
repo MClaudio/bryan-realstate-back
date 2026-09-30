@@ -665,6 +665,39 @@ export class FilesService {
     return { url: finalLocal };
   }
 
+  /**
+   * Reads the raw bytes of a stored file (S3 or local disk). Used server-side
+   * (e.g. PDF generation). Never throws: returns null when the file can't be read.
+   */
+  async getFileBuffer(file: { id?: string; path?: string | null } | null | undefined): Promise<Buffer | null> {
+    if (!file?.path) return null;
+    const raw = String(file.path);
+    try {
+      if (this.useS3 && this.s3Client) {
+        let key = raw;
+        if (key.includes('.amazonaws.com/')) {
+          key = key.split('.amazonaws.com/')[1];
+        } else if (/^https?:\/\//i.test(key)) {
+          try { key = new URL(key).pathname.replace(/^\//, ''); } catch { /* keep */ }
+        }
+        const res = await this.s3Client.send(new GetObjectCommand({ Bucket: this.bucketName, Key: key }));
+        if (!res.Body) return null;
+        const bytes = await (res.Body as any).transformToByteArray();
+        return Buffer.from(bytes);
+      }
+      if (/^https?:\/\//i.test(raw)) {
+        const res = await fetch(raw);
+        if (!res.ok) return null;
+        return Buffer.from(await res.arrayBuffer());
+      }
+      const relative = raw.replace(/^\/+/, '');
+      return await fs.promises.readFile(path.join(process.cwd(), relative));
+    } catch (e: any) {
+      this.logger.warn(`[getFileBuffer] id=${file.id ?? '?'} path=${JSON.stringify(raw)} failed: ${e?.message || String(e)}`);
+      return null;
+    }
+  }
+
   async enrichFile(file: any): Promise<any> {
     if (!file) return file;
     const t0 = Date.now();
