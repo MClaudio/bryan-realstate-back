@@ -6,6 +6,7 @@ import {
   PROPERTY_RECOMMENDATION_SCHEMA,
   PROPERTY_RECOMMENDATION_SYSTEM_PROMPT,
 } from './prompts/property-recommendation.prompt';
+import { toNumbers } from './utils/text-guards';
 
 export type AiInterestLevel = 'ALTO' | 'MEDIO' | 'BAJO';
 
@@ -13,6 +14,20 @@ export interface AiRecommendationClient {
   id: string;
   i?: string;
   n?: string;
+}
+
+/** Recomendaciones calificadas por el equipo, usadas como ejemplos para que la IA aprenda. */
+export interface AiLearningExample {
+  propiedad: string;
+  busca: string;
+  ia: string;
+  motivo?: string;
+  comentario?: string;
+}
+
+export interface AiLearningExamples {
+  incorrectas: AiLearningExample[];
+  correctas: AiLearningExample[];
 }
 
 export interface AiRecommendationMatch {
@@ -41,7 +56,37 @@ interface CompletionResult {
 }
 
 const LEVELS: AiInterestLevel[] = ['ALTO', 'MEDIO', 'BAJO'];
+const LEVEL_RANK: Record<AiInterestLevel, number> = {
+  BAJO: 0,
+  MEDIO: 1,
+  ALTO: 2,
+};
+/** Rango de puntaje de cada nivel (el puntaje se ajusta al nivel final). */
+const SCORE_BANDS: Record<AiInterestLevel, [number, number]> = {
+  ALTO: [80, 100],
+  MEDIO: [60, 79],
+  BAJO: [40, 59],
+};
 const MAX_REASON_LENGTH = 300;
+
+/**
+ * Regla de presupuesto aplicada en código (no se confía en que el modelo haga la cuenta).
+ * ratio = precio / presupuesto del cliente.
+ */
+export const BUDGET_RULES = {
+  /** Hasta 10 % por encima: sin penalización. */
+  noPenaltyMax: 1.1,
+  /** Hasta 30 % por encima: como máximo MEDIO. Por encima: BAJO. */
+  mediumMax: 1.3,
+  /** Más del doble: no se recomienda. */
+  excludeAbove: 2,
+} as const;
+
+const formatUsd = (value: number) =>
+  `$${String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
+
+const minLevel = (a: AiInterestLevel, b: AiInterestLevel): AiInterestLevel =>
+  LEVEL_RANK[a] <= LEVEL_RANK[b] ? a : b;
 
 /**
  * Recomendador de clientes para una propiedad, directo contra OpenAI (sin n8n).
@@ -80,12 +125,14 @@ export class PropertyRecommendationAiService {
   async recommend(
     property: Record<string, unknown>,
     clients: AiRecommendationClient[],
+    learning?: AiLearningExamples,
   ): Promise<AiRecommendationResult> {
     const unavailable = this.getUnavailableReason();
     if (unavailable) return { ok: false, ...unavailable };
     if (clients.length === 0) return { ok: true, matches: [], calls: 0 };
 
     const { batchSize, minScore } = this.config.recommendation;
+    const price = Number(property.precio);
     const best = new Map<string, AiRecommendationMatch>();
     let calls = 0;
 
@@ -97,11 +144,10 @@ export class PropertyRecommendationAiService {
     // Lotes secuenciales: si uno falla, falla todo (no se guarda la huella y se reintenta después).
     while (queue.length > 0) {
       const batch = queue.shift()!;
-      const allowedIds = new Set(batch.map((c) => c.id));
 
       let response: CompletionResult;
       try {
-        response = await this.requestCompletion(property, batch);
+        response = await this.requestCompletion(property, batch, learning);
         calls += 1;
       } catch (error) {
         return this.toFailure(error);
@@ -118,7 +164,7 @@ export class PropertyRecommendationAiService {
         continue;
       }
 
-      const matches = this.validate(response.output, allowedIds, minScore);
+      const matches = this.validate(response.output, batch, minScore, price);
       if (!matches) {
         const detail = response.refusal
           ? `la IA rechazó la solicitud: ${response.refusal}`
@@ -139,46 +185,97 @@ export class PropertyRecommendationAiService {
     return { ok: true, matches, calls };
   }
 
-  /** Filtra ids no enviados (inventados), puntajes bajo el umbral y normaliza campos. */
+  /**
+   * Filtra ids no enviados (inventados), aplica la regla de presupuesto, ajusta el puntaje al nivel
+   * y descarta los que quedan bajo el umbral.
+   */
   validate(
     output: unknown,
-    allowedIds: Set<string>,
+    batch: AiRecommendationClient[],
     minScore: number,
+    price?: number,
   ): AiRecommendationMatch[] | null {
     const list = (output as { c?: unknown } | null)?.c;
     if (!Array.isArray(list)) return null;
 
+    const clientsById = new Map(batch.map((c) => [c.id, c]));
     const matches: AiRecommendationMatch[] = [];
     let invented = 0;
     for (const item of list) {
       const raw = (item ?? {}) as Record<string, unknown>;
       const id = typeof raw.id === 'string' ? raw.id.trim() : '';
-      if (!allowedIds.has(id)) {
+      const client = clientsById.get(id);
+      if (!client) {
         if (id) invented += 1;
         continue;
       }
-      const score = Math.max(0, Math.min(100, Math.round(Number(raw.s))));
-      if (!Number.isFinite(score) || score < minScore) continue;
 
-      const level = String(raw.l ?? '').toUpperCase() as AiInterestLevel;
-      const reason =
+      let reason =
         typeof raw.r === 'string'
           ? raw.r.replace(/\s+/g, ' ').trim().slice(0, MAX_REASON_LENGTH)
           : '';
       if (!reason) continue;
 
-      matches.push({
-        client_id: id,
-        interest_level: LEVELS.includes(level) ? level : 'MEDIO',
-        reason,
-        score,
-      });
+      const rawLevel = String(raw.l ?? '').toUpperCase() as AiInterestLevel;
+      let level: AiInterestLevel = LEVELS.includes(rawLevel)
+        ? rawLevel
+        : 'MEDIO';
+
+      const budget = this.trustedBudget(raw.b, client);
+      if (budget && price && Number.isFinite(price) && price > 0) {
+        const ratio = price / budget;
+        if (ratio > BUDGET_RULES.excludeAbove) continue;
+        const cap: AiInterestLevel =
+          ratio > BUDGET_RULES.mediumMax
+            ? 'BAJO'
+            : ratio > BUDGET_RULES.noPenaltyMax
+              ? 'MEDIO'
+              : 'ALTO';
+        if (LEVEL_RANK[cap] < LEVEL_RANK[level]) {
+          level = minLevel(level, cap);
+          const note = `Precio ${formatUsd(price)} supera su presupuesto de ${formatUsd(budget)}.`;
+          reason = `${reason.replace(/[.\s]+$/, '')}. ${note}`.slice(
+            0,
+            MAX_REASON_LENGTH,
+          );
+        }
+      }
+
+      const [bandMin, bandMax] = SCORE_BANDS[level];
+      const rawScore = Math.round(Number(raw.s));
+      const score = Math.max(
+        bandMin,
+        Math.min(bandMax, Number.isFinite(rawScore) ? rawScore : bandMin),
+      );
+      if (score < minScore) continue;
+
+      matches.push({ client_id: id, interest_level: level, reason, score });
     }
     if (invented > 0)
       this.logger.warn(
         `Recomendación IA: ${invented} id(s) no enviados fueron descartados`,
       );
     return matches;
+  }
+
+  /**
+   * El presupuesto que dice la IA solo se acepta si esa cifra aparece en el texto del cliente
+   * ("hasta 25mil" → 25000 está en el texto; un número inventado no).
+   */
+  private trustedBudget(
+    value: unknown,
+    client: AiRecommendationClient,
+  ): number | null {
+    const budget = Math.round(Number(value));
+    if (
+      value === null ||
+      value === undefined ||
+      !Number.isFinite(budget) ||
+      budget <= 0
+    )
+      return null;
+    const known = new Set(toNumbers(`${client.i ?? ''} ${client.n ?? ''}`));
+    return known.has(String(budget)) ? budget : null;
   }
 
   private getClient(): OpenAI {
@@ -195,6 +292,7 @@ export class PropertyRecommendationAiService {
   private async requestCompletion(
     property: Record<string, unknown>,
     clients: AiRecommendationClient[],
+    learning?: AiLearningExamples,
   ): Promise<CompletionResult> {
     const { model, temperature, maxOutputTokens } = this.config.recommendation;
     const completion = await this.getClient().chat.completions.create({
@@ -208,6 +306,16 @@ export class PropertyRecommendationAiService {
       },
       messages: [
         { role: 'system', content: PROPERTY_RECOMMENDATION_SYSTEM_PROMPT },
+        // Aprendizaje: va después del system prompt fijo (que sigue en caché) y antes de los datos.
+        ...(learning &&
+        (learning.incorrectas.length > 0 || learning.correctas.length > 0)
+          ? [
+              {
+                role: 'user' as const,
+                content: JSON.stringify({ aprendizaje: learning }),
+              },
+            ]
+          : []),
         {
           role: 'user',
           content: JSON.stringify({ propiedad: property, clientes: clients }),

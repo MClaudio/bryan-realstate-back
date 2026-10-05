@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  AiLearningExamples,
   AiRecommendationClient,
   PropertyRecommendationAiService,
 } from '../ai/property-recommendation-ai.service';
@@ -54,8 +55,14 @@ export class PropertyRecommendationService {
   async recommendCandidates(input: {
     property: Record<string, unknown>;
     clients: AiRecommendationClient[];
+    /** Recomendaciones calificadas por el equipo (aprendizaje). */
+    learning?: AiLearningExamples;
   }): Promise<RecommendationResult> {
-    const result = await this.ai.recommend(input.property, input.clients);
+    const result = await this.ai.recommend(
+      input.property,
+      input.clients,
+      input.learning,
+    );
     if (!result.ok) return result;
 
     return {
