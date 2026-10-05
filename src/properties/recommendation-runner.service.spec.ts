@@ -49,8 +49,16 @@ const setup = (property: typeof baseProperty, clients: ReturnType<typeof client>
       .fn()
       .mockResolvedValue({ summary: { created: 1, updated: 0, deleted: 0, discarded: 0 } }),
   };
-  const runner = new RecommendationRunnerService(prisma as never, recommender as never, interests as never);
-  return { runner, prisma, recommender, interests };
+  const feedback = {
+    getLearningExamples: jest.fn().mockResolvedValue({ incorrectas: [], correctas: [] }),
+  };
+  const runner = new RecommendationRunnerService(
+    prisma as never,
+    recommender as never,
+    interests as never,
+    feedback as never,
+  );
+  return { runner, prisma, recommender, interests, feedback };
 };
 
 const currentHash = computeRecommendationHash(buildRecommendationProperty(baseProperty));
@@ -72,7 +80,8 @@ describe('RecommendationRunnerService', () => {
     ]);
     // Nombre completado desde la BD; nunca se borran interesados.
     expect(result.candidates[0].name).toBe('Cliente A');
-    expect(interests.reconcileRecommendations.mock.calls[0][2]).toEqual({ removeMissing: false });
+    // Automático: solo agrega/actualiza, nunca borra.
+    expect(interests.reconcileRecommendations.mock.calls[0][2]).toEqual({ mode: 'merge' });
     expect(prisma.property.update.mock.calls[0][0].data.recommendationHash).toBe(currentHash);
   });
 
@@ -104,8 +113,8 @@ describe('RecommendationRunnerService', () => {
     expect(recommender.recommendCandidates.mock.calls[0][0].clients).toEqual([{ id: 'n', i: 'Busca terreno en Gualaceo' }]);
   });
 
-  it('el botón manual fuerza modo full aunque nada cambió', async () => {
-    const { runner, prisma } = setup(
+  it('el botón manual fuerza modo full, reevalúa a los de la IA y los reemplaza (no los manuales)', async () => {
+    const { runner, prisma, interests } = setup(
       { ...baseProperty, recommendationHash: currentHash, recommendationRunAt: new Date() },
       [client('a', 'Busca terreno')],
     );
@@ -113,7 +122,35 @@ describe('RecommendationRunnerService', () => {
     const result = await runner.run('p1', { trigger: 'manual' });
 
     expect(result.mode).toBe('full');
-    expect(prisma.client.findMany.mock.calls[0][0].where.interestUpdatedAt).toBeUndefined();
+    const where = prisma.client.findMany.mock.calls[0][0].where;
+    expect(where.interestUpdatedAt).toBeUndefined();
+    // Solo se excluyen los vinculados a mano: los de la IA vuelven a evaluarse.
+    expect(where.interests).toEqual({ none: { propertyId: 'p1', source: 'manual' } });
+    expect(interests.reconcileRecommendations.mock.calls[0][2]).toEqual({ mode: 'replaceAi' });
+  });
+
+  it('botón manual sin coincidencias: igual reconcilia para quitar las recomendaciones IA previas', async () => {
+    const { runner, recommender, interests } = setup(baseProperty, [client('a', 'Busca casa en Quito')]);
+    recommender.recommendCandidates.mockResolvedValue({ ok: true, calls: 1, candidates: [] });
+    interests.reconcileRecommendations.mockResolvedValue({
+      summary: { created: 0, updated: 0, deleted: 2, discarded: 0 },
+    });
+
+    const result = await runner.run('p1', { trigger: 'manual' });
+
+    expect(interests.reconcileRecommendations).toHaveBeenCalledWith('p1', [], { mode: 'replaceAi' });
+    expect(result.status).toBe('applied');
+    expect(result.summary?.deleted).toBe(2);
+  });
+
+  it('automático sin coincidencias no toca la lista', async () => {
+    const { runner, recommender, interests } = setup(baseProperty, [client('a', 'Busca casa en Quito')]);
+    recommender.recommendCandidates.mockResolvedValue({ ok: true, calls: 1, candidates: [] });
+
+    const result = await runner.run('p1', { trigger: 'update' });
+
+    expect(result.status).toBe('no_candidates');
+    expect(interests.reconcileRecommendations).not.toHaveBeenCalled();
   });
 
   it('si la IA falla no guarda la huella (se reintenta en la próxima ocasión)', async () => {
@@ -134,5 +171,28 @@ describe('RecommendationRunnerService', () => {
     await runner.run('p1', { trigger: 'update' });
 
     expect(recommender.recommendCandidates.mock.calls[0][0].clients).toEqual([{ id: 'b', i: 'Busca casa' }]);
+  });
+
+  it('excluye a los clientes calificados (like o dislike) para esa propiedad', async () => {
+    const { runner, prisma } = setup(baseProperty, [client('a', 'Busca terreno')]);
+
+    await runner.run('p1', { trigger: 'manual' });
+
+    expect(prisma.client.findMany.mock.calls[0][0].where.recommendationFeedback).toEqual({
+      none: { propertyId: 'p1', deletedAt: null },
+    });
+  });
+
+  it('envía al recomendador los ejemplos de aprendizaje', async () => {
+    const { runner, recommender, feedback } = setup(baseProperty, [client('a', 'Busca terreno')]);
+    const learning = {
+      incorrectas: [{ propiedad: 'Terreno, Gualaceo, $50.000', busca: 'hasta 25mil', ia: 'ALTO: x', motivo: 'presupuesto' }],
+      correctas: [],
+    };
+    feedback.getLearningExamples.mockResolvedValue(learning);
+
+    await runner.run('p1', { trigger: 'update' });
+
+    expect(recommender.recommendCandidates.mock.calls[0][0].learning).toEqual(learning);
   });
 });

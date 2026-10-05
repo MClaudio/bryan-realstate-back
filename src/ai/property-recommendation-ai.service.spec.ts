@@ -44,7 +44,7 @@ describe('PropertyRecommendationAiService', () => {
       jest.fn().mockResolvedValue(
         reply([
           { id: 'a', l: 'ALTO', s: 92, r: 'Terreno en Gualaceo' },
-          { id: 'c', l: 'MEDIO', s: 40, r: 'Afinidad baja' },
+          { id: 'c', l: 'BAJO', s: 45, r: 'Afinidad baja' },
           { id: 'zzz', l: 'ALTO', s: 99, r: 'Inventado' },
         ]),
       ),
@@ -149,6 +149,77 @@ describe('PropertyRecommendationAiService', () => {
     expect(await service.recommend(property, clients)).toMatchObject({ ok: false, reason: 'no_credit' });
     expect(await service.recommend(property, clients)).toMatchObject({ ok: false, reason: 'no_credit' });
     expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  describe('regla de presupuesto (aplicada en código)', () => {
+    const guaimincay = { tipo: 'Terreno', ciudad: 'Gualaceo', terreno_m2: 502, precio: 50000 };
+    const run = async (budgetText: string, aiBudget: number | null, level = 'ALTO', score = 90) => {
+      const service = new PropertyRecommendationAiService(buildConfig({ minScore: 40 }));
+      mockCreate(
+        service,
+        jest.fn().mockResolvedValue(
+          reply([{ id: 'x', l: level, s: score, b: aiBudget, r: 'Terreno en Gualaceo, 502m2, zona urbana.' }]),
+        ),
+      );
+      const result = await service.recommend(guaimincay, [{ id: 'x', i: budgetText }]);
+      return result.ok ? result.matches : [];
+    };
+
+    it('caso Guaimincay: $50.000 frente a hasta $25.000 (el doble) → BAJO con motivo', async () => {
+      const [match] = await run('Busca terrenos en Gualaceo hasta 25mil dólares', 25000);
+      expect(match).toEqual({
+        client_id: 'x',
+        interest_level: 'BAJO',
+        score: 59,
+        reason: 'Terreno en Gualaceo, 502m2, zona urbana. Precio $50.000 supera su presupuesto de $25.000.',
+      });
+    });
+
+    it('más del doble del presupuesto → no se recomienda', async () => {
+      expect(await run('Busca terreno hasta $20mil', 20000)).toEqual([]);
+    });
+
+    it('entre 10 % y 30 % por encima → como máximo MEDIO', async () => {
+      const [match] = await run('Busca terreno con presupuesto de 42mil', 42000);
+      expect(match.interest_level).toBe('MEDIO');
+      expect(match.score).toBe(79);
+      expect(match.reason).toContain('supera su presupuesto de $42.000');
+    });
+
+    it('hasta 10 % por encima → sin penalización', async () => {
+      const [match] = await run('Busca terreno de unos 46mil dólares', 46000);
+      expect(match.interest_level).toBe('ALTO');
+      expect(match.reason).not.toContain('supera');
+    });
+
+    it('si el presupuesto no está en el texto del cliente, se ignora', async () => {
+      const [match] = await run('Busca terreno en Gualaceo', 25000);
+      expect(match.interest_level).toBe('ALTO');
+    });
+
+    it('un nivel que ya era BAJO no se sube y el puntaje queda en su banda', async () => {
+      const [match] = await run('Busca terreno hasta 60mil', 60000, 'BAJO', 95);
+      expect(match).toMatchObject({ interest_level: 'BAJO', score: 59 });
+    });
+  });
+
+  it('envía el aprendizaje entre el system prompt y los datos; sin ejemplos no lo envía', async () => {
+    const service = new PropertyRecommendationAiService(buildConfig());
+    const create = mockCreate(service, jest.fn().mockResolvedValue(reply([])));
+    const learning = {
+      incorrectas: [{ propiedad: 'Terreno, Gualaceo, $50.000', busca: 'hasta 25mil', ia: 'ALTO: x', motivo: 'presupuesto' }],
+      correctas: [],
+    };
+
+    await service.recommend(property, clients, learning);
+    const withLearning = create.mock.calls[0][0].messages;
+    expect(withLearning).toHaveLength(3);
+    expect(withLearning[0].role).toBe('system');
+    expect(JSON.parse(withLearning[1].content)).toEqual({ aprendizaje: learning });
+    expect(JSON.parse(withLearning[2].content).clientes).toBeDefined();
+
+    await service.recommend(property, clients, { incorrectas: [], correctas: [] });
+    expect(create.mock.calls[1][0].messages).toHaveLength(2);
   });
 
   it('respeta la desactivación', async () => {

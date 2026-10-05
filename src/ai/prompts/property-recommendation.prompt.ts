@@ -33,18 +33,29 @@ Criterios (en orden de importancia, solo para clientes con tipo compatible):
 1. Tipo de propiedad compatible según la regla anterior.
 2. Ubicación: misma ciudad/cantón, sector o cercanía indicada por el cliente
    (ej. "cerca de Gualaceo", "a 10 minutos", "zona urbana"). Otra ciudad sin relación = descartar.
-3. Presupuesto: si el precio supera el presupuesto del cliente en más de un 10 %, el nivel máximo
-   es MEDIO; si lo supera en más de un 30 %, NO lo incluyas. Sin presupuesto indicado = no penaliza.
+3. Presupuesto: NO penalices tú el precio. Extrae en "b" el presupuesto máximo del cliente en USD si
+   lo indica en "i" o "n" (ej. "hasta 25mil dólares" → 25000, "presupuesto de $70mil" → 70000,
+   "150.000" → 150000). Si no indica presupuesto, b = null. El sistema compara b con el precio y
+   ajusta el nivel automáticamente; evalúa el nivel como si el precio estuviera dentro del presupuesto.
 4. Área, topografía, servicios, uso (vivienda, comercial, inversión, campo) y otras preferencias.
+
+APRENDIZAJE: puede llegar antes un mensaje {"aprendizaje": {incorrectas, correctas}} con recomendaciones
+calificadas por el equipo inmobiliario (propiedad, lo que busca el cliente, lo que dijo la IA, motivo y
+comentario). Las "incorrectas" son errores que NO debes repetir: generaliza por el motivo
+(presupuesto, ubicacion, tipo, tamano, no_busca = el cliente ya no busca o ya compró, otro + comentario)
+y aplica esa lección a clientes y propiedades parecidos. Las "correctas" muestran el criterio esperado.
+Prioriza estas lecciones sobre tu criterio general, sin violar las reglas de tipo de propiedad ni de presupuesto.
 
 Excluye a quien no busca comprar/invertir (proveedores, dueños que venden, técnicos, clientes que ya
 compraron sin nuevo interés, familiares o referencias sin interés propio).
 
 Salida: solo coincidencias reales, ordenadas de mayor a menor puntaje.
 - id: exactamente el id recibido. Nunca inventes ids.
-- l: ALTO (cumple tipo, ubicación y presupuesto), MEDIO (cumple lo principal con alguna diferencia),
-  BAJO (afinidad parcial). Ningún nivel, ni siquiera BAJO, admite un tipo de propiedad incompatible.
-- s: puntaje 0-100.
+- l: ALTO (cumple tipo, ubicación y demás preferencias), MEDIO (cumple lo principal con alguna
+  diferencia), BAJO (afinidad parcial). Ningún nivel, ni siquiera BAJO, admite un tipo de propiedad
+  incompatible.
+- s: puntaje acorde al nivel: ALTO 80-100, MEDIO 60-79, BAJO 40-59.
+- b: presupuesto máximo del cliente en USD (entero) o null.
 - r: motivo en español, máximo 20 palabras, citando la coincidencia concreta. No inventes datos.
 Si nadie coincide, devuelve {"c":[]}.
 `.trim();
@@ -62,11 +73,15 @@ export const PROPERTY_RECOMMENDATION_SCHEMA = {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['id', 'l', 's', 'r'],
+          required: ['id', 'l', 's', 'b', 'r'],
           properties: {
             id: { type: 'string' },
             l: { type: 'string', enum: ['ALTO', 'MEDIO', 'BAJO'] },
             s: { type: 'integer' },
+            b: {
+              type: ['integer', 'null'],
+              description: 'Presupuesto máximo del cliente en USD',
+            },
             r: { type: 'string' },
           },
         },

@@ -76,7 +76,7 @@ export default registerAs('ai', (): AiConfig => {
       temperature: toNumber(process.env.OPENAI_RECOMMENDATION_TEMPERATURE, 0),
       maxOutputTokens: toNumber(process.env.OPENAI_RECOMMENDATION_MAX_OUTPUT_TOKENS, 2000),
       batchSize: Math.max(1, toNumber(process.env.AI_RECOMMENDATION_BATCH_SIZE, 120)),
-      minScore: toNumber(process.env.AI_RECOMMENDATION_MIN_SCORE, 60),
+      minScore: toNumber(process.env.AI_RECOMMENDATION_MIN_SCORE, 40),
       timeoutMs: toNumber(process.env.OPENAI_RECOMMENDATION_TIMEOUT_MS, 60_000),
     },
   };

@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PropertyInterestsService } from '../property-interests/property-interests.service';
+import { RecommendationFeedbackService } from '../property-interests/recommendation-feedback.service';
 import {
   PropertyRecommendationService,
   RecommendedCandidate,
@@ -13,7 +14,7 @@ import {
   computeRecommendationHash,
   hasRecommendationText,
 } from './recommendation-payload';
-import { PropertyStatus } from '@prisma/client';
+import { InterestSource, PropertyStatus } from '@prisma/client';
 
 export type RecommendationTrigger =
   | 'create'
@@ -43,7 +44,12 @@ export interface RecommendationRunResult {
   trigger: RecommendationTrigger;
   status: RecommendationStatus;
   candidates: RecommendedCandidate[];
-  summary: { created: number; updated: number; deleted: number; discarded: number } | null;
+  summary: {
+    created: number;
+    updated: number;
+    deleted: number;
+    discarded: number;
+  } | null;
   error: string | null;
   mode?: RecommendationMode;
   /** Clientes enviados a la IA y llamadas realizadas (0 cuando se omite). */
@@ -68,6 +74,7 @@ export class RecommendationRunnerService {
     private readonly prisma: PrismaService,
     private readonly recommender: PropertyRecommendationService,
     private readonly propertyInterestsService: PropertyInterestsService,
+    private readonly feedbackService: RecommendationFeedbackService,
   ) {}
 
   private async loadProperty(propertyId: string) {
@@ -90,20 +97,29 @@ export class RecommendationRunnerService {
   }
 
   /** Huella actual de los datos de la propiedad que usa la IA. */
-  computeHash(property: Parameters<typeof buildRecommendationProperty>[0]): string {
+  computeHash(
+    property: Parameters<typeof buildRecommendationProperty>[0],
+  ): string {
     return computeRecommendationHash(buildRecommendationProperty(property));
   }
 
   async run(
     propertyId: string,
-    options: { trigger: RecommendationTrigger; persist?: boolean; force?: boolean },
+    options: {
+      trigger: RecommendationTrigger;
+      persist?: boolean;
+      force?: boolean;
+    },
   ): Promise<RecommendationRunResult> {
     const persist = options.persist ?? true;
     const force = options.force ?? options.trigger === 'manual';
 
     const property = await this.prisma.property.findFirst({
       where: { id: propertyId, deletedAt: null },
-      include: { city: { select: { name: true } }, advisor: { select: { id: true } } },
+      include: {
+        city: { select: { name: true } },
+        advisor: { select: { id: true } },
+      },
     });
     if (!property) throw new NotFoundException('Propiedad no encontrada');
 
@@ -118,23 +134,52 @@ export class RecommendationRunnerService {
     const runStartedAt = new Date();
     const compactProperty = buildRecommendationProperty(property);
     const hash = computeRecommendationHash(compactProperty);
-    const propertyChanged = !property.recommendationRunAt || property.recommendationHash !== hash;
-    const mode: RecommendationMode = force || propertyChanged ? 'full' : 'delta';
+    const propertyChanged =
+      !property.recommendationRunAt || property.recommendationHash !== hash;
+    const mode: RecommendationMode =
+      force || propertyChanged ? 'full' : 'delta';
+    // Botón manual: se reevalúan también los interesados que puso la IA y luego se reemplazan
+    // (los manuales nunca se tocan). En automático solo se agregan/actualizan.
+    const reconcileMode = force ? 'replaceAi' : 'merge';
 
     const clients = (
       await this.prisma.client.findMany({
         where: {
-          OR: [{ interestDescription: { not: null } }, { notes: { not: null } }],
-          interests: { none: { propertyId } },
-          ...(mode === 'delta' && { interestUpdatedAt: { gt: property.recommendationRunAt! } }),
+          OR: [
+            { interestDescription: { not: null } },
+            { notes: { not: null } },
+          ],
+          interests: force
+            ? { none: { propertyId, source: InterestSource.manual } }
+            : { none: { propertyId } },
+          // Calificados por el equipo para esta propiedad: dislike = bloqueado, like = ya confirmado.
+          recommendationFeedback: { none: { propertyId, deletedAt: null } },
+          ...(mode === 'delta' && {
+            interestUpdatedAt: { gt: property.recommendationRunAt! },
+          }),
         },
-        select: { id: true, firstName: true, lastName: true, interestDescription: true, notes: true },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          interestDescription: true,
+          notes: true,
+        },
         orderBy: { createdAt: 'desc' },
       })
     ).filter(hasRecommendationText);
 
     if (mode === 'delta' && clients.length === 0) {
-      return { ...base, status: 'skipped', candidates: [], summary: null, error: null, mode, clientsEvaluated: 0, aiCalls: 0 };
+      return {
+        ...base,
+        status: 'skipped',
+        candidates: [],
+        summary: null,
+        error: null,
+        mode,
+        clientsEvaluated: 0,
+        aiCalls: 0,
+      };
     }
 
     const markRun = async () => {
@@ -146,17 +191,28 @@ export class RecommendationRunnerService {
       });
     };
 
-    if (clients.length === 0) {
+    if (clients.length === 0 && reconcileMode === 'merge') {
       await markRun();
-      return { ...base, status: 'no_candidates', candidates: [], summary: null, error: null, mode, clientsEvaluated: 0, aiCalls: 0 };
+      return {
+        ...base,
+        status: 'no_candidates',
+        candidates: [],
+        summary: null,
+        error: null,
+        mode,
+        clientsEvaluated: 0,
+        aiCalls: 0,
+      };
     }
 
     this.logger.log(
       `Recommendation ${options.trigger} for ${base.propertyCode}: mode=${mode}, clients=${clients.length}`,
     );
+    const learning = await this.feedbackService.getLearningExamples();
     const result = await this.recommender.recommendCandidates({
       property: compactProperty,
       clients: clients.map(buildRecommendationClient),
+      learning,
     });
     if (!result.ok) {
       this.logger.warn(
@@ -174,12 +230,25 @@ export class RecommendationRunnerService {
     }
 
     // Los nombres no se envían a la IA: se completan desde la BD.
-    const names = new Map(clients.map((c) => [c.id, `${c.firstName} ${c.lastName}`.replace(/\s+/g, ' ').trim()]));
-    const candidates = result.candidates.map((c) => ({ ...c, name: names.get(c.client_id) ?? c.name }));
+    const names = new Map(
+      clients.map((c) => [
+        c.id,
+        `${c.firstName} ${c.lastName}`.replace(/\s+/g, ' ').trim(),
+      ]),
+    );
+    const candidates = result.candidates.map((c) => ({
+      ...c,
+      name: names.get(c.client_id) ?? c.name,
+    }));
 
-    const applied = await this.apply(base, candidates, persist);
+    const applied = await this.apply(base, candidates, persist, reconcileMode);
     if (applied.status !== 'failed') await markRun();
-    return { ...applied, mode, clientsEvaluated: clients.length, aiCalls: result.calls };
+    return {
+      ...applied,
+      mode,
+      clientsEvaluated: clients.length,
+      aiCalls: result.calls,
+    };
   }
 
   /** Re-applies the candidates stored in the latest AI notification, without calling n8n. */
@@ -200,6 +269,7 @@ export class RecommendationRunnerService {
       },
       last.candidates,
       true,
+      'replaceAi',
     );
   }
 
@@ -207,7 +277,11 @@ export class RecommendationRunnerService {
     await this.loadProperty(propertyId);
     const last = await this.findLastCandidates(propertyId);
     return last
-      ? { available: true, candidates: last.candidates.length, createdAt: last.createdAt }
+      ? {
+          available: true,
+          candidates: last.candidates.length,
+          createdAt: last.createdAt,
+        }
       : { available: false, candidates: 0, createdAt: null };
   }
 
@@ -227,7 +301,8 @@ export class RecommendationRunnerService {
         .map((c) => ({
           client_id: String(c.client_id),
           name: String(c.name ?? ''),
-          interest_level: (c.interest_level ?? 'MEDIO') as RecommendedCandidate['interest_level'],
+          interest_level: (c.interest_level ??
+            'MEDIO') as RecommendedCandidate['interest_level'],
           reason: String(c.reason ?? ''),
           score: c.score,
         }));
@@ -237,26 +312,43 @@ export class RecommendationRunnerService {
   }
 
   private async apply(
-    base: Omit<RecommendationRunResult, 'status' | 'candidates' | 'summary' | 'error'>,
+    base: Omit<
+      RecommendationRunResult,
+      'status' | 'candidates' | 'summary' | 'error'
+    >,
     candidates: RecommendedCandidate[],
     persist: boolean,
+    reconcileMode: 'merge' | 'replaceAi',
   ): Promise<RecommendationRunResult> {
-    // An empty answer never clears the list: interested clients registered by
-    // hand must not disappear because the AI recommended nobody this time.
-    if (candidates.length === 0) {
-      return { ...base, status: 'no_candidates', candidates, summary: null, error: null };
+    // In automatic runs an empty answer never touches the list. With `replaceAi`
+    // (manual button) an empty answer removes the previous AI recommendations;
+    // interested clients registered by hand are never touched in either mode.
+    if (candidates.length === 0 && reconcileMode === 'merge') {
+      return {
+        ...base,
+        status: 'no_candidates',
+        candidates,
+        summary: null,
+        error: null,
+      };
     }
     if (!persist) {
-      return { ...base, status: 'preview', candidates, summary: null, error: null };
+      return {
+        ...base,
+        status: 'preview',
+        candidates,
+        summary: null,
+        error: null,
+      };
     }
 
     try {
-      // La IA nunca borra interesados: no recibe a los ya vinculados ni a los registrados a mano.
-      const { summary } = await this.propertyInterestsService.reconcileRecommendations(
-        base.propertyId,
-        candidates,
-        { removeMissing: false },
-      );
+      const { summary } =
+        await this.propertyInterestsService.reconcileRecommendations(
+          base.propertyId,
+          candidates,
+          { mode: reconcileMode },
+        );
       const s = {
         created: summary.created,
         updated: summary.updated,
@@ -270,7 +362,12 @@ export class RecommendationRunnerService {
       }
       return {
         ...base,
-        status: s.created || s.updated || s.deleted ? 'applied' : 'no_changes',
+        status:
+          s.created || s.updated || s.deleted
+            ? 'applied'
+            : candidates.length === 0
+              ? 'no_candidates'
+              : 'no_changes',
         candidates,
         summary: s,
         error: null,

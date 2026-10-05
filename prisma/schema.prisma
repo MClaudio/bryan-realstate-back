@@ -7,28 +7,29 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid()) @db.Uuid
-  firstName String   @map("first_name")
-  lastName  String   @map("last_name")
-  username  String   @unique
-  email     String   @unique
-  password  String   @map("password_hash")
-  phone     String?
-  address   String?
-  ruc       String   @unique
-  type      UserType
-  hasChangedDefaultPassword Boolean @default(false) @map("has_changed_default_password")
-  isActive Boolean @default(true) @map("is_active")
-  resetPasswordToken String? @map("reset_password_token")
-  resetPasswordExpires DateTime? @map("reset_password_expires")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                        String    @id @default(uuid()) @db.Uuid
+  firstName                 String    @map("first_name")
+  lastName                  String    @map("last_name")
+  username                  String    @unique
+  email                     String    @unique
+  password                  String    @map("password_hash")
+  phone                     String?
+  address                   String?
+  ruc                       String    @unique
+  type                      UserType
+  hasChangedDefaultPassword Boolean   @default(false) @map("has_changed_default_password")
+  isActive                  Boolean   @default(true) @map("is_active")
+  resetPasswordToken        String?   @map("reset_password_token")
+  resetPasswordExpires      DateTime? @map("reset_password_expires")
+  createdAt                 DateTime  @default(now()) @map("created_at")
+  updatedAt                 DateTime  @updatedAt @map("updated_at")
 
-  clients    Client[]
-  properties Property[]
-  notifications Notification[]
-  checkedChecklistItems PropertyChecklistItem[]
-  completedSaleStages   SaleProcessStage[]
+  clients                Client[]
+  properties             Property[]
+  notifications          Notification[]
+  checkedChecklistItems  PropertyChecklistItem[]
+  completedSaleStages    SaleProcessStage[]
+  recommendationFeedback RecommendationFeedback[]
 
   @@map("users")
 }
@@ -39,28 +40,29 @@ enum NotificationActionType {
 }
 
 model Client {
-  id        String    @id @default(uuid()) @db.Uuid
-  firstName String    @map("first_name")
-  lastName  String    @map("last_name")
-  email     String?
-  password  String?   @map("password_hash")
-  phone     String
-  address   String?
-  ruc       String?
-  birthDate DateTime? @map("birth_date") @db.Date
-  googleContactId String?   @unique @map("google_contact_id")
-  googleSyncedAt  DateTime? @map("google_synced_at")
-  userId    String?   @map("user_id") @db.Uuid
-  lastLogin Boolean   @default(false) @map("last_login")
-  notes                String?   @map("notes")
-  interestDescription  String?   @map("interest_description")
+  id                     String                   @id @default(uuid()) @db.Uuid
+  firstName              String                   @map("first_name")
+  lastName               String                   @map("last_name")
+  email                  String?
+  password               String?                  @map("password_hash")
+  phone                  String
+  address                String?
+  ruc                    String?
+  birthDate              DateTime?                @map("birth_date") @db.Date
+  googleContactId        String?                  @unique @map("google_contact_id")
+  googleSyncedAt         DateTime?                @map("google_synced_at")
+  userId                 String?                  @map("user_id") @db.Uuid
+  lastLogin              Boolean                  @default(false) @map("last_login")
+  notes                  String?                  @map("notes")
+  interestDescription    String?                  @map("interest_description")
   /// Lo mantiene un trigger de Postgres: cambia solo cuando cambian interest_description o notes.
-  interestUpdatedAt    DateTime? @map("interest_updated_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  user      User?     @relation(fields: [userId], references: [id])
-  interests PropertyInterest[]
-  negotiatedProperties Property[]
+  interestUpdatedAt      DateTime?                @map("interest_updated_at")
+  createdAt              DateTime                 @default(now()) @map("created_at")
+  updatedAt              DateTime                 @updatedAt @map("updated_at")
+  user                   User?                    @relation(fields: [userId], references: [id])
+  interests              PropertyInterest[]
+  recommendationFeedback RecommendationFeedback[]
+  negotiatedProperties   Property[]
 
   @@map("clients")
 }
@@ -76,57 +78,58 @@ model City {
 }
 
 model Property {
-  id                String         @id @default(uuid()) @db.Uuid
-  code              String
-  address           String
-  cityId            String?        @map("city_id") @db.Uuid
-  referenceSector   String?        @map("reference_sector")
-  locationUrl       String         @map("location_url")
-  constructionArea  Decimal        @map("construction_area") @db.Decimal(10, 2)
-  landArea          Decimal        @map("land_area") @db.Decimal(10, 2)
-  hasBasicServices  Boolean        @default(false) @map("has_basic_services")
-  basicServices     Json           @map("basic_services")
-  features          String?
-  propertyType      PropertyType   @map("property_type")
-  constructionYears Int?           @map("construction_years")
-  latitude          Decimal        @db.Decimal(10, 8)
-  longitude         Decimal        @db.Decimal(11, 8)
-  topography        Topography
-  zone              Zone
-  cityTime          Int?           @map("city_time")
-  observations      String?
-  publicShortDescription String? @map("public_short_description")
-  publicLongDescription  String? @map("public_long_description")
+  id                     String                   @id @default(uuid()) @db.Uuid
+  code                   String
+  address                String
+  cityId                 String?                  @map("city_id") @db.Uuid
+  referenceSector        String?                  @map("reference_sector")
+  locationUrl            String                   @map("location_url")
+  constructionArea       Decimal                  @map("construction_area") @db.Decimal(10, 2)
+  landArea               Decimal                  @map("land_area") @db.Decimal(10, 2)
+  hasBasicServices       Boolean                  @default(false) @map("has_basic_services")
+  basicServices          Json                     @map("basic_services")
+  features               String?
+  propertyType           PropertyType             @map("property_type")
+  constructionYears      Int?                     @map("construction_years")
+  latitude               Decimal                  @db.Decimal(10, 8)
+  longitude              Decimal                  @db.Decimal(11, 8)
+  topography             Topography
+  zone                   Zone
+  cityTime               Int?                     @map("city_time")
+  observations           String?
+  publicShortDescription String?                  @map("public_short_description")
+  publicLongDescription  String?                  @map("public_long_description")
   /// Huella de los datos enviados a la IA de recomendaciones y fecha de la última ejecución exitosa.
-  recommendationHash     String?   @map("recommendation_hash")
-  recommendationRunAt    DateTime? @map("recommendation_run_at")
-  status            PropertyStatus @default(Validacion)
-  advisorId         String         @map("advisor_id") @db.Uuid
-  owner             String?
-  price             Decimal        @db.Decimal(12, 2)
-  maxPrice          Decimal?       @map("max_price") @db.Decimal(12, 2)
-  minPrice          Decimal        @map("min_price") @db.Decimal(12, 2)
-  commission        Decimal        @db.Decimal(5, 2)
-  salePrice         Decimal?       @map("sale_price") @db.Decimal(12, 2)
-  isPublic          Boolean        @default(true) @map("is_public")
-  facebookUrl       String?        @map("facebook_url")
-  tiktokUrl         String?        @map("tiktok_url")
-  instagramUrl      String?        @map("instagram_url")
-  youtubeUrl        String?        @map("youtube_url")
-  createdAt         DateTime       @default(now()) @map("created_at")
-  updatedAt         DateTime       @updatedAt @map("updated_at")
-  deletedAt         DateTime?      @map("deleted_at")
-  isActive              Boolean        @default(true) @map("is_active")
-  isFeatured            Boolean        @default(false) @map("is_featured")
-  negotiationClientId   String?        @map("negotiation_client_id") @db.Uuid
-  city                  City?          @relation(fields: [cityId], references: [id])
-  advisor               User           @relation(fields: [advisorId], references: [id])
-  negotiationClient     Client?        @relation(fields: [negotiationClientId], references: [id])
-  files                 PropertyFile[]
-  processes             Process[]
-  interests             PropertyInterest[]
-  checklistItems        PropertyChecklistItem[]
-  saleProcess           SaleProcess?
+  recommendationHash     String?                  @map("recommendation_hash")
+  recommendationRunAt    DateTime?                @map("recommendation_run_at")
+  status                 PropertyStatus           @default(Validacion)
+  advisorId              String                   @map("advisor_id") @db.Uuid
+  owner                  String?
+  price                  Decimal                  @db.Decimal(12, 2)
+  maxPrice               Decimal?                 @map("max_price") @db.Decimal(12, 2)
+  minPrice               Decimal                  @map("min_price") @db.Decimal(12, 2)
+  commission             Decimal                  @db.Decimal(5, 2)
+  salePrice              Decimal?                 @map("sale_price") @db.Decimal(12, 2)
+  isPublic               Boolean                  @default(true) @map("is_public")
+  facebookUrl            String?                  @map("facebook_url")
+  tiktokUrl              String?                  @map("tiktok_url")
+  instagramUrl           String?                  @map("instagram_url")
+  youtubeUrl             String?                  @map("youtube_url")
+  createdAt              DateTime                 @default(now()) @map("created_at")
+  updatedAt              DateTime                 @updatedAt @map("updated_at")
+  deletedAt              DateTime?                @map("deleted_at")
+  isActive               Boolean                  @default(true) @map("is_active")
+  isFeatured             Boolean                  @default(false) @map("is_featured")
+  negotiationClientId    String?                  @map("negotiation_client_id") @db.Uuid
+  city                   City?                    @relation(fields: [cityId], references: [id])
+  advisor                User                     @relation(fields: [advisorId], references: [id])
+  negotiationClient      Client?                  @relation(fields: [negotiationClientId], references: [id])
+  files                  PropertyFile[]
+  processes              Process[]
+  interests              PropertyInterest[]
+  recommendationFeedback RecommendationFeedback[]
+  checklistItems         PropertyChecklistItem[]
+  saleProcess            SaleProcess?
 
   @@index([code])
   @@index([cityId])
@@ -210,7 +213,7 @@ enum Zone {
 }
 
 enum PropertyStatus {
-  Validacion @map("Validación")
+  Validacion  @map("Validación")
   Nuevo
   Negociacion @map("Negociación")
   Vendido
@@ -334,6 +337,51 @@ model Blacklist {
   @@map("blacklist")
 }
 
+/// Calificación del equipo a una recomendación de la IA. Histórico de solo agregar:
+/// al cambiar o quitar una calificación, la anterior se marca con deletedAt (eliminado lógico).
+model RecommendationFeedback {
+  id              String          @id @default(uuid()) @db.Uuid
+  propertyId      String          @map("property_id") @db.Uuid
+  clientId        String          @map("client_id") @db.Uuid
+  userId          String?         @map("user_id") @db.Uuid
+  rating          FeedbackRating
+  reason          FeedbackReason?
+  comment         String?
+  /// Snapshot de lo que la IA recomendó y con qué datos
+  interestLevel   InterestLevel?  @map("interest_level")
+  aiReason        String?         @map("ai_reason")
+  clientInterest  String?         @map("client_interest")
+  propertySummary Json?           @map("property_summary")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  deletedAt       DateTime?       @map("deleted_at")
+  property        Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  client          Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user            User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([propertyId, clientId, deletedAt])
+  @@index([rating, deletedAt, createdAt])
+  @@map("recommendation_feedback")
+}
+
+enum FeedbackRating {
+  like
+  dislike
+}
+
+enum FeedbackReason {
+  presupuesto
+  ubicacion
+  tipo
+  tamano
+  no_busca
+  otro
+}
+
+enum InterestSource {
+  manual
+  ia
+}
+
 enum InterestLevel {
   Bajo
   Medio
@@ -342,16 +390,18 @@ enum InterestLevel {
 }
 
 model PropertyInterest {
-  id            String        @id @default(uuid()) @db.Uuid
-  propertyId    String        @map("property_id") @db.Uuid
-  clientId      String        @map("client_id") @db.Uuid
-  interestDate  DateTime      @map("interest_date") @db.Date
-  interestLevel InterestLevel @map("interest_level")
+  id            String         @id @default(uuid()) @db.Uuid
+  propertyId    String         @map("property_id") @db.Uuid
+  clientId      String         @map("client_id") @db.Uuid
+  interestDate  DateTime       @map("interest_date") @db.Date
+  interestLevel InterestLevel  @map("interest_level")
   notes         String?
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
-  property      Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  /// manual = formulario o WhatsApp; ia = recomendación automática (el botón de IA solo reemplaza estos)
+  source        InterestSource @default(manual)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  property      Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   @@map("property_interests")
 }
@@ -389,14 +439,14 @@ model ContactSyncExclusion {
 }
 
 model ContactSyncLog {
-  id                String   @id @default(uuid()) @db.Uuid
-  direction         String
-  importedCount     Int      @default(0) @map("imported_count")
-  duplicateCount    Int      @default(0) @map("duplicate_count")
-  excludedCount     Int      @default(0) @map("excluded_count")
-  invalidCount      Int      @default(0) @map("invalid_count")
-  details           Json?    @map("details")
-  createdAt         DateTime @default(now()) @map("created_at")
+  id             String   @id @default(uuid()) @db.Uuid
+  direction      String
+  importedCount  Int      @default(0) @map("imported_count")
+  duplicateCount Int      @default(0) @map("duplicate_count")
+  excludedCount  Int      @default(0) @map("excluded_count")
+  invalidCount   Int      @default(0) @map("invalid_count")
+  details        Json?    @map("details")
+  createdAt      DateTime @default(now()) @map("created_at")
 
   @@map("contact_sync_logs")
 }
