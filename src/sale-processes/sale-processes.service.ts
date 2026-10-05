@@ -14,6 +14,7 @@ import {
   StageValues,
   computeProgress,
   isStageComplete,
+  MANUAL_STAGES,
   newSaleProcessCreate,
   stageHasData,
 } from './sale-process.rules';
@@ -46,7 +47,7 @@ const valuesOf = (row: StageRow): StageValues => ({
   totalValue: toNumber(row.totalValue),
   depositAmount: toNumber(row.depositAmount),
   registryStatus: row.registryStatus,
-  manualCompleted: row.stage === SaleStage.Municipio && row.completed,
+  manualCompleted: MANUAL_STAGES.includes(row.stage) && row.completed,
 });
 
 @Injectable()

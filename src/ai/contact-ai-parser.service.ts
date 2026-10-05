@@ -240,7 +240,6 @@ export class ContactAiParserService {
       firstName = recovered.firstName;
       lastName = recovered.lastName;
     }
-    if (!lastName) lastName = 'N/A';
 
     // Intereses y notas: pueden redactarse de nuevo, pero no pueden introducir cifras nuevas.
     let interestDescription = asMultilineText(output.interestDescription);
