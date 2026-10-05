@@ -22,6 +22,9 @@ export const STAGES_BY_METHOD: Record<PaymentMethod, SaleStage[]> = {
   Efectivo: STAGE_ORDER.filter((s) => s !== SaleStage.Cooperativa),
 };
 
+/** Stages completed by hand (checkbox) instead of by their data. */
+export const MANUAL_STAGES: SaleStage[] = [SaleStage.Cooperativa, SaleStage.Municipio];
+
 export const STAGE_LABELS: Record<SaleStage, string> = {
   Sena: 'Seña',
   Cooperativa: 'Cooperativa',
@@ -33,7 +36,7 @@ export const STAGE_LABELS: Record<SaleStage, string> = {
 /** Fields each stage accepts on update (anything else is rejected). */
 export const STAGE_FIELDS: Record<SaleStage, string[]> = {
   Sena: ['observation', 'totalValue', 'depositAmount'],
-  Cooperativa: ['observation'],
+  Cooperativa: ['observation', 'completed'],
   Municipio: ['observation', 'completed'],
   Notaria: ['observation'],
   Registro: ['observation', 'registryStatus'],
@@ -44,7 +47,7 @@ export interface StageValues {
   totalValue: number | null;
   depositAmount: number | null;
   registryStatus: RegistryStatus | null;
-  /** Only meaningful for Municipio, the one stage completed by hand. */
+  /** Only meaningful for Cooperativa and Municipio, the stages completed by hand. */
   manualCompleted: boolean;
 }
 
@@ -52,9 +55,9 @@ export function isStageComplete(stage: SaleStage, v: StageValues): boolean {
   switch (stage) {
     case SaleStage.Sena:
       return (v.depositAmount ?? 0) > 0;
-    case SaleStage.Cooperativa:
     case SaleStage.Notaria:
       return !!v.observation?.trim();
+    case SaleStage.Cooperativa:
     case SaleStage.Municipio:
       return v.manualCompleted;
     case SaleStage.Registro:
