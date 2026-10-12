@@ -27,7 +27,7 @@ export const splitFullName = (fullName?: string | null): { firstName: string; la
   }
 
   if (parts.length === 1) {
-    return { firstName: parts[0], lastName: 'N/A' };
+    return { firstName: parts[0], lastName: '' };
   }
 
   return {
@@ -88,7 +88,7 @@ export const normalizeNamePair = (
 
   return {
     firstName: trimAndCollapseSpaces(workingFirst || 'Sin'),
-    lastName: trimAndCollapseSpaces(workingLast || 'Nombre'),
+    lastName: trimAndCollapseSpaces(workingLast),
   };
 };
 

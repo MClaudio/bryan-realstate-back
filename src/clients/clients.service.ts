@@ -97,6 +97,7 @@ export class ClientsService {
   async findAll() {
     return this.prisma.client.findMany({
       orderBy: { createdAt: 'desc' },
+      omit: { password: true },
       include: {
         user: {
           select: {
@@ -112,6 +113,8 @@ export class ClientsService {
   async findOne(id: string) {
     const client = await this.prisma.client.findUnique({
       where: { id },
+      // Nunca devolver el hash de la contraseña en la API.
+      omit: { password: true },
       include: {
         user: {
           select: {
