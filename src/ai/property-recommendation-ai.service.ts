@@ -55,7 +55,6 @@ interface CompletionResult {
   refusal: string | null;
 }
 
-const LEVELS: AiInterestLevel[] = ['ALTO', 'MEDIO', 'BAJO'];
 const LEVEL_RANK: Record<AiInterestLevel, number> = {
   BAJO: 0,
   MEDIO: 1,
@@ -67,26 +66,48 @@ const SCORE_BANDS: Record<AiInterestLevel, [number, number]> = {
   MEDIO: [60, 79],
   BAJO: [40, 59],
 };
-const MAX_REASON_LENGTH = 300;
+const MAX_REASON_LENGTH = 400;
 
 /**
- * Regla de presupuesto aplicada en código (no se confía en que el modelo haga la cuenta).
- * ratio = precio / presupuesto del cliente.
+ * Regla de área aplicada en código: el área mínima pedida por el cliente admite hasta 10 % menos,
+ * pero esa coincidencia queda como BAJO y se explica en el motivo. Debajo de eso no se recomienda.
+ * El presupuesto NO tiene margen: precio mayor al presupuesto = no se recomienda.
  */
-export const BUDGET_RULES = {
-  /** Hasta 10 % por encima: sin penalización. */
-  noPenaltyMax: 1.1,
-  /** Hasta 30 % por encima: como máximo MEDIO. Por encima: BAJO. */
-  mediumMax: 1.3,
-  /** Más del doble: no se recomienda. */
-  excludeAbove: 2,
+export const AREA_RULES = {
+  toleranceMin: 0.9,
 } as const;
 
-const formatUsd = (value: number) =>
-  `$${String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`;
+/** Tipos cuya área relevante es el terreno; en Departamento es la construcción. */
+const LAND_TYPES = new Set(['terreno', 'lote', 'finca']);
+
+const formatM2 = (value: number) =>
+  `${String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')} m²`;
 
 const minLevel = (a: AiInterestLevel, b: AiInterestLevel): AiInterestLevel =>
   LEVEL_RANK[a] <= LEVEL_RANK[b] ? a : b;
+
+const flag = <T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+): T | null => {
+  const text = typeof value === 'string' ? value.trim().toUpperCase() : '';
+  return (allowed as readonly string[]).includes(text) ? (text as T) : null;
+};
+
+/** Área de la propiedad que se compara con el mínimo del cliente (null = no se verifica en código). */
+const propertyArea = (property: Record<string, unknown>): number | null => {
+  const type =
+    typeof property.tipo === 'string' ? property.tipo.toLowerCase() : '';
+  const raw = LAND_TYPES.has(type)
+    ? property.terreno_m2
+    : type === 'departamento'
+      ? property.construccion_m2
+      : null;
+  const area = Number(raw);
+  return raw !== null && raw !== undefined && Number.isFinite(area) && area > 0
+    ? area
+    : null;
+};
 
 /**
  * Recomendador de clientes para una propiedad, directo contra OpenAI (sin n8n).
@@ -132,7 +153,6 @@ export class PropertyRecommendationAiService {
     if (clients.length === 0) return { ok: true, matches: [], calls: 0 };
 
     const { batchSize, minScore } = this.config.recommendation;
-    const price = Number(property.precio);
     const best = new Map<string, AiRecommendationMatch>();
     let calls = 0;
 
@@ -164,7 +184,7 @@ export class PropertyRecommendationAiService {
         continue;
       }
 
-      const matches = this.validate(response.output, batch, minScore, price);
+      const matches = this.validate(response.output, batch, minScore, property);
       if (!matches) {
         const detail = response.refusal
           ? `la IA rechazó la solicitud: ${response.refusal}`
@@ -186,18 +206,22 @@ export class PropertyRecommendationAiService {
   }
 
   /**
-   * Filtra ids no enviados (inventados), aplica la regla de presupuesto, ajusta el puntaje al nivel
-   * y descarta los que quedan bajo el umbral.
+   * Filtra ids no enviados (inventados), aplica las reglas eliminatorias (tipo, ubicación, área,
+   * preferencias, presupuesto), calcula el nivel, arma "Coincide en: …" y descarta los que quedan
+   * bajo el umbral.
    */
   validate(
     output: unknown,
     batch: AiRecommendationClient[],
     minScore: number,
-    price?: number,
+    property: Record<string, unknown> = {},
   ): AiRecommendationMatch[] | null {
     const list = (output as { c?: unknown } | null)?.c;
     if (!Array.isArray(list)) return null;
 
+    const price = Number(property.precio);
+    const hasPrice = Number.isFinite(price) && price > 0;
+    const area = propertyArea(property);
     const clientsById = new Map(batch.map((c) => [c.id, c]));
     const matches: AiRecommendationMatch[] = [];
     let invented = 0;
@@ -210,36 +234,61 @@ export class PropertyRecommendationAiService {
         continue;
       }
 
-      let reason =
-        typeof raw.r === 'string'
-          ? raw.r.replace(/\s+/g, ' ').trim().slice(0, MAX_REASON_LENGTH)
-          : '';
-      if (!reason) continue;
+      const detail =
+        typeof raw.r === 'string' ? raw.r.replace(/\s+/g, ' ').trim() : '';
+      if (!detail) continue;
 
-      const rawLevel = String(raw.l ?? '').toUpperCase() as AiInterestLevel;
-      let level: AiInterestLevel = LEVELS.includes(rawLevel)
-        ? rawLevel
-        : 'MEDIO';
+      // Reglas eliminatorias: tipo y ubicación son obligatorios; ningún requisito explícito puede fallar.
+      const t = flag(raw.t, ['SI', 'NO'] as const);
+      const u = flag(raw.u, ['SI', 'NO', 'ND'] as const);
+      const a = flag(raw.a, ['SI', 'NO', 'ND'] as const) ?? 'ND';
+      const p = flag(raw.p, ['SI', 'PARCIAL', 'NO', 'ND'] as const) ?? 'ND';
+      if (t !== 'SI' || !u || u === 'NO' || a === 'NO' || p === 'NO') continue;
 
-      const budget = this.trustedBudget(raw.b, client);
-      if (budget && price && Number.isFinite(price) && price > 0) {
-        const ratio = price / budget;
-        if (ratio > BUDGET_RULES.excludeAbove) continue;
-        const cap: AiInterestLevel =
-          ratio > BUDGET_RULES.mediumMax
-            ? 'BAJO'
-            : ratio > BUDGET_RULES.noPenaltyMax
-              ? 'MEDIO'
-              : 'ALTO';
-        if (LEVEL_RANK[cap] < LEVEL_RANK[level]) {
-          level = minLevel(level, cap);
-          const note = `Precio ${formatUsd(price)} supera su presupuesto de ${formatUsd(budget)}.`;
-          reason = `${reason.replace(/[.\s]+$/, '')}. ${note}`.slice(
-            0,
-            MAX_REASON_LENGTH,
+      const known = this.clientNumbers(client);
+      let level: AiInterestLevel = 'ALTO';
+      const coincide: string[] = ['tipo'];
+      const notes: string[] = [];
+
+      if (u === 'SI') coincide.push('ubicación');
+      else level = minLevel(level, 'MEDIO');
+
+      // Área: verificada en código cuando el mínimo aparece en el texto del cliente.
+      const minArea = this.trustedNumber(raw.am, known);
+      if (minArea && area) {
+        if (area < minArea * AREA_RULES.toleranceMin) continue;
+        if (area < minArea) {
+          level = minLevel(level, 'BAJO');
+          notes.push(
+            `Área ${formatM2(area)} está dentro de la tolerancia del 10 % del mínimo pedido (${formatM2(minArea)}).`,
           );
+        } else {
+          coincide.push('área');
         }
+      } else if (a === 'SI') {
+        coincide.push('área');
       }
+
+      if (p === 'SI') coincide.push('características');
+      else if (p === 'PARCIAL') {
+        level = minLevel(level, 'MEDIO');
+        notes.push('Algunas características no se pueden confirmar.');
+      }
+
+      // Presupuesto: tope estricto, sin margen.
+      const budget = this.trustedNumber(raw.b, known);
+      if (budget && hasPrice) {
+        if (price > budget) continue;
+        coincide.push('precio');
+      }
+
+      const reason = [
+        `Coincide en: ${coincide.join(', ')}.`,
+        `${detail.replace(/[.\s]+$/, '')}.`,
+        ...notes,
+      ]
+        .join(' ')
+        .slice(0, MAX_REASON_LENGTH);
 
       const [bandMin, bandMax] = SCORE_BANDS[level];
       const rawScore = Math.round(Number(raw.s));
@@ -258,24 +307,19 @@ export class PropertyRecommendationAiService {
     return matches;
   }
 
+  private clientNumbers(client: AiRecommendationClient): Set<string> {
+    return new Set(toNumbers(`${client.i ?? ''} ${client.n ?? ''}`));
+  }
+
   /**
-   * El presupuesto que dice la IA solo se acepta si esa cifra aparece en el texto del cliente
-   * ("hasta 25mil" → 25000 está en el texto; un número inventado no).
+   * Una cifra que dice la IA (presupuesto, área mínima) solo se acepta si aparece en el texto del
+   * cliente ("hasta 25mil" → 25000 está en el texto; un número inventado no).
    */
-  private trustedBudget(
-    value: unknown,
-    client: AiRecommendationClient,
-  ): number | null {
-    const budget = Math.round(Number(value));
-    if (
-      value === null ||
-      value === undefined ||
-      !Number.isFinite(budget) ||
-      budget <= 0
-    )
+  private trustedNumber(value: unknown, known: Set<string>): number | null {
+    const n = Math.round(Number(value));
+    if (value === null || value === undefined || !Number.isFinite(n) || n <= 0)
       return null;
-    const known = new Set(toNumbers(`${client.i ?? ''} ${client.n ?? ''}`));
-    return known.has(String(budget)) ? budget : null;
+    return known.has(String(n)) ? n : null;
   }
 
   private getClient(): OpenAI {

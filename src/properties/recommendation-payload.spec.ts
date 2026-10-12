@@ -1,4 +1,6 @@
+import { createHash } from 'node:crypto';
 import {
+  RECOMMENDATION_RULES_VERSION,
   buildRecommendationClient,
   buildRecommendationProperty,
   computeRecommendationHash,
@@ -55,6 +57,12 @@ describe('recommendation-payload', () => {
     const b = computeRecommendationHash({ servicios: ['Agua'], precio: 1, tipo: 'Casa' });
     expect(a).toBe(b);
     expect(a).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('la huella incluye la versión de reglas (subirla reevalúa todas las propiedades)', () => {
+    const withoutVersion = createHash('sha256').update('{"tipo":"Casa"}').digest('hex');
+    expect(RECOMMENDATION_RULES_VERSION).toBeGreaterThanOrEqual(2);
+    expect(computeRecommendationHash({ tipo: 'Casa' })).not.toBe(withoutVersion);
   });
 
   it('la huella no cambia con fotos, precio mínimo, comisión ni descripciones', () => {

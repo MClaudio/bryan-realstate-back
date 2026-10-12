@@ -138,9 +138,9 @@ export class RecommendationRunnerService {
       !property.recommendationRunAt || property.recommendationHash !== hash;
     const mode: RecommendationMode =
       force || propertyChanged ? 'full' : 'delta';
-    // Botón manual: se reevalúan también los interesados que puso la IA y luego se reemplazan
-    // (los manuales nunca se tocan). En automático solo se agregan/actualizan.
-    const reconcileMode = force ? 'replaceAi' : 'merge';
+    // Botón manual o propiedad/reglas cambiadas: se reevalúan también los interesados que puso la IA
+    // y luego se reemplazan (los manuales nunca se tocan). Si nada cambió solo se agregan/actualizan.
+    const reconcileMode = force || propertyChanged ? 'replaceAi' : 'merge';
 
     const clients = (
       await this.prisma.client.findMany({
@@ -149,9 +149,11 @@ export class RecommendationRunnerService {
             { interestDescription: { not: null } },
             { notes: { not: null } },
           ],
-          interests: force
-            ? { none: { propertyId, source: InterestSource.manual } }
-            : { none: { propertyId } },
+          // Al reemplazar se reevalúan también los interesados IA (si no, se borrarían sin evaluar).
+          interests:
+            reconcileMode === 'replaceAi'
+              ? { none: { propertyId, source: InterestSource.manual } }
+              : { none: { propertyId } },
           // Calificados por el equipo para esta propiedad: dislike = bloqueado, like = ya confirmado.
           recommendationFeedback: { none: { propertyId, deletedAt: null } },
           ...(mode === 'delta' && {

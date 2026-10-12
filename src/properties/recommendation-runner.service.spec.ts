@@ -64,7 +64,7 @@ const setup = (property: typeof baseProperty, clients: ReturnType<typeof client>
 const currentHash = computeRecommendationHash(buildRecommendationProperty(baseProperty));
 
 describe('RecommendationRunnerService', () => {
-  it('modo full cuando la propiedad nunca se evaluó: todos los clientes, guarda la huella', async () => {
+  it('modo full cuando la propiedad cambió: reevalúa a los de la IA, los reemplaza y guarda la huella', async () => {
     const { runner, prisma, recommender, interests } = setup(baseProperty, [client('a', 'Busca terreno'), client('b', 'Busca casa')]);
 
     const result = await runner.run('p1', { trigger: 'update' });
@@ -73,15 +73,16 @@ describe('RecommendationRunnerService', () => {
     expect(result.status).toBe('applied');
     const where = prisma.client.findMany.mock.calls[0][0].where;
     expect(where.interestUpdatedAt).toBeUndefined();
-    expect(where.interests).toEqual({ none: { propertyId: 'p1' } });
+    // Solo se excluyen los vinculados a mano: los de la IA se reevalúan con las reglas actuales.
+    expect(where.interests).toEqual({ none: { propertyId: 'p1', source: 'manual' } });
     expect(recommender.recommendCandidates.mock.calls[0][0].clients).toEqual([
       { id: 'a', i: 'Busca terreno' },
       { id: 'b', i: 'Busca casa' },
     ]);
-    // Nombre completado desde la BD; nunca se borran interesados.
+    // Nombre completado desde la BD.
     expect(result.candidates[0].name).toBe('Cliente A');
-    // Automático: solo agrega/actualiza, nunca borra.
-    expect(interests.reconcileRecommendations.mock.calls[0][2]).toEqual({ mode: 'merge' });
+    // Huella nueva (datos o versión de reglas): se reemplazan los de la IA (los manuales no se tocan).
+    expect(interests.reconcileRecommendations.mock.calls[0][2]).toEqual({ mode: 'replaceAi' });
     expect(prisma.property.update.mock.calls[0][0].data.recommendationHash).toBe(currentHash);
   });
 
@@ -100,9 +101,9 @@ describe('RecommendationRunnerService', () => {
     expect(prisma.property.update).not.toHaveBeenCalled();
   });
 
-  it('modo delta: propiedad igual, solo clientes con intereses nuevos', async () => {
+  it('modo delta: propiedad igual, solo clientes con intereses nuevos y sin borrar nada', async () => {
     const runAt = new Date('2026-09-30T10:00:00Z');
-    const { runner, recommender } = setup(
+    const { runner, prisma, recommender, interests } = setup(
       { ...baseProperty, recommendationHash: currentHash, recommendationRunAt: runAt },
       [client('n', 'Busca terreno en Gualaceo')],
     );
@@ -111,6 +112,8 @@ describe('RecommendationRunnerService', () => {
 
     expect(result.mode).toBe('delta');
     expect(recommender.recommendCandidates.mock.calls[0][0].clients).toEqual([{ id: 'n', i: 'Busca terreno en Gualaceo' }]);
+    expect(prisma.client.findMany.mock.calls[0][0].where.interests).toEqual({ none: { propertyId: 'p1' } });
+    expect(interests.reconcileRecommendations.mock.calls[0][2]).toEqual({ mode: 'merge' });
   });
 
   it('el botón manual fuerza modo full, reevalúa a los de la IA y los reemplaza (no los manuales)', async () => {
@@ -143,14 +146,29 @@ describe('RecommendationRunnerService', () => {
     expect(result.summary?.deleted).toBe(2);
   });
 
-  it('automático sin coincidencias no toca la lista', async () => {
-    const { runner, recommender, interests } = setup(baseProperty, [client('a', 'Busca casa en Quito')]);
+  it('automático sin cambios en la propiedad y sin coincidencias no toca la lista', async () => {
+    const { runner, recommender, interests } = setup(
+      { ...baseProperty, recommendationHash: currentHash, recommendationRunAt: new Date('2026-09-30T10:00:00Z') },
+      [client('a', 'Busca casa en Quito')],
+    );
     recommender.recommendCandidates.mockResolvedValue({ ok: true, calls: 1, candidates: [] });
 
-    const result = await runner.run('p1', { trigger: 'update' });
+    const result = await runner.run('p1', { trigger: 'scheduler' });
 
     expect(result.status).toBe('no_candidates');
     expect(interests.reconcileRecommendations).not.toHaveBeenCalled();
+  });
+
+  it('automático con propiedad o reglas cambiadas y sin coincidencias quita las recomendaciones IA previas', async () => {
+    const { runner, recommender, interests } = setup(
+      { ...baseProperty, recommendationHash: 'huella-de-reglas-anteriores', recommendationRunAt: new Date() },
+      [client('a', 'Busca casa en Quito')],
+    );
+    recommender.recommendCandidates.mockResolvedValue({ ok: true, calls: 1, candidates: [] });
+
+    await runner.run('p1', { trigger: 'scheduler' });
+
+    expect(interests.reconcileRecommendations.mock.calls[0][2]).toEqual({ mode: 'replaceAi' });
   });
 
   it('si la IA falla no guarda la huella (se reintenta en la próxima ocasión)', async () => {
