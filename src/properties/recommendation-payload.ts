@@ -85,8 +85,16 @@ const stableStringify = (value: unknown): string => {
   return JSON.stringify(value);
 };
 
+/**
+ * Versión de las reglas del recomendador. Subirla cambia la huella de todas las propiedades, así el
+ * cron las reevalúa completas y reemplaza las recomendaciones IA hechas con reglas anteriores.
+ */
+export const RECOMMENDATION_RULES_VERSION = 2;
+
 export const computeRecommendationHash = (compactProperty: Record<string, unknown>): string =>
-  createHash('sha256').update(stableStringify(compactProperty)).digest('hex');
+  createHash('sha256')
+    .update(`v${RECOMMENDATION_RULES_VERSION}:${stableStringify(compactProperty)}`)
+    .digest('hex');
 
 export const hasRecommendationText = (client: RecommendationClientSource): boolean =>
   Boolean(cleanText(client.interestDescription) || cleanText(client.notes));
