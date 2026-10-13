@@ -133,6 +133,21 @@ describe('PropertyInterestsService.reconcileRecommendations', () => {
     expect(deletedIds).toEqual(['i1', 'i2']);
   });
 
+  it('replaceAi con scopeClientIds: solo quita recomendaciones IA de los clientes reevaluados', async () => {
+    const { service, tx } = setup();
+
+    // C2 cambió su interés y ya no coincide; C1 no se reevaluó (fuera del scope) y se conserva.
+    await service.reconcileRecommendations('p1', [], {
+      mode: 'replaceAi',
+      scopeClientIds: [C2, C3],
+    });
+
+    const deletedIds = tx.propertyInterest.delete.mock.calls.map(
+      (c) => c[0].where.id,
+    );
+    expect(deletedIds).toEqual(['i2']);
+  });
+
   it('no recrea clientes con dislike activo y no borra los que tienen like', async () => {
     const { service, tx } = setup([
       { clientId: C5, rating: FeedbackRating.dislike },

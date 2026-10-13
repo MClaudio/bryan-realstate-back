@@ -151,8 +151,9 @@ export class PropertyInterestsService {
      * Los interesados `manual` (formulario, WhatsApp) nunca se modifican ni se borran.
      * - `merge`: solo agrega/actualiza interesados de la IA; no borra nada.
      * - `replaceAi` (por defecto): además borra los de origen IA que no vienen en la lista.
+     *   Con `scopeClientIds` solo se borran los de esos clientes (los reevaluados); el resto no se toca.
      */
-    options: { mode?: 'merge' | 'replaceAi' } = {},
+    options: { mode?: 'merge' | 'replaceAi'; scopeClientIds?: string[] } = {},
   ) {
     const mode = options.mode ?? 'replaceAi';
     const property = await this.prisma.property.findFirst({
@@ -294,9 +295,13 @@ export class PropertyInterestsService {
         }
 
         const wantedIds = new Set(normalizedMap.keys());
+        const scope = options.scopeClientIds
+          ? new Set(options.scopeClientIds)
+          : null;
         for (const curr of mode === 'replaceAi' ? existing : []) {
           if (
             curr.source === InterestSource.ia &&
+            (!scope || scope.has(curr.clientId)) &&
             !wantedIds.has(curr.clientId) &&
             !liked.has(curr.clientId)
           ) {

@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto';
 import {
+  PROPERTY_RECOMMENDATION_SCHEMA,
+  PROPERTY_RECOMMENDATION_SYSTEM_PROMPT,
+} from '../ai/prompts/property-recommendation.prompt';
+import {
+  RECOMMENDATION_RULES_FINGERPRINT,
   RECOMMENDATION_RULES_VERSION,
   buildRecommendationClient,
   buildRecommendationProperty,
@@ -59,10 +64,26 @@ describe('recommendation-payload', () => {
     expect(a).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('la huella incluye la versión de reglas (subirla reevalúa todas las propiedades)', () => {
-    const withoutVersion = createHash('sha256').update('{"tipo":"Casa"}').digest('hex');
-    expect(RECOMMENDATION_RULES_VERSION).toBeGreaterThanOrEqual(2);
-    expect(computeRecommendationHash({ tipo: 'Casa' })).not.toBe(withoutVersion);
+  it('la huella incluye la marca de reglas (si cambia, se reevalúan todas las propiedades)', () => {
+    const withoutRules = createHash('sha256').update('{"tipo":"Casa"}').digest('hex');
+    expect(computeRecommendationHash({ tipo: 'Casa' })).not.toBe(withoutRules);
+    expect(computeRecommendationHash({ tipo: 'Casa' }, 'reglas-anteriores')).not.toBe(
+      computeRecommendationHash({ tipo: 'Casa' }),
+    );
+  });
+
+  it('la marca de reglas sale del prompt, el schema y la versión (cambia sola al editar el prompt)', () => {
+    const expected = createHash('sha256')
+      .update(
+        [
+          RECOMMENDATION_RULES_VERSION,
+          PROPERTY_RECOMMENDATION_SYSTEM_PROMPT,
+          JSON.stringify(PROPERTY_RECOMMENDATION_SCHEMA),
+        ].join('\n'),
+      )
+      .digest('hex')
+      .slice(0, 16);
+    expect(RECOMMENDATION_RULES_FINGERPRINT).toBe(expected);
   });
 
   it('la huella no cambia con fotos, precio mínimo, comisión ni descripciones', () => {
