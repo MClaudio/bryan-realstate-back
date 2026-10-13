@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
 import {
+  PROPERTY_RECOMMENDATION_SCHEMA,
+  PROPERTY_RECOMMENDATION_SYSTEM_PROMPT,
+} from '../ai/prompts/property-recommendation.prompt';
+import {
   NumberLike,
   cleanText,
   positiveNumber,
@@ -86,14 +90,34 @@ const stableStringify = (value: unknown): string => {
 };
 
 /**
- * Versión de las reglas del recomendador. Subirla cambia la huella de todas las propiedades, así el
- * cron las reevalúa completas y reemplaza las recomendaciones IA hechas con reglas anteriores.
+ * Versión de las reglas que viven solo en código (tipo, área, vendedores, presupuesto en
+ * property-recommendation-ai.service.ts). Súbela al cambiar una de esas reglas; los cambios del
+ * prompt o del schema ya se detectan solos en RECOMMENDATION_RULES_FINGERPRINT.
  */
 export const RECOMMENDATION_RULES_VERSION = 5;
 
-export const computeRecommendationHash = (compactProperty: Record<string, unknown>): string =>
+/**
+ * Marca de las reglas del recomendador: cambia sola si cambia el prompt, el schema o la versión.
+ * Va dentro de la huella de cada propiedad, así el cron reevalúa todas las propiedades completas y
+ * reemplaza las recomendaciones IA hechas con reglas anteriores.
+ */
+export const RECOMMENDATION_RULES_FINGERPRINT = createHash('sha256')
+  .update(
+    [
+      RECOMMENDATION_RULES_VERSION,
+      PROPERTY_RECOMMENDATION_SYSTEM_PROMPT,
+      JSON.stringify(PROPERTY_RECOMMENDATION_SCHEMA),
+    ].join('\n'),
+  )
+  .digest('hex')
+  .slice(0, 16);
+
+export const computeRecommendationHash = (
+  compactProperty: Record<string, unknown>,
+  rulesFingerprint: string = RECOMMENDATION_RULES_FINGERPRINT,
+): string =>
   createHash('sha256')
-    .update(`v${RECOMMENDATION_RULES_VERSION}:${stableStringify(compactProperty)}`)
+    .update(`${rulesFingerprint}:${stableStringify(compactProperty)}`)
     .digest('hex');
 
 export const hasRecommendationText = (client: RecommendationClientSource): boolean =>

@@ -112,8 +112,12 @@ describe('RecommendationRunnerService', () => {
 
     expect(result.mode).toBe('delta');
     expect(recommender.recommendCandidates.mock.calls[0][0].clients).toEqual([{ id: 'n', i: 'Busca terreno en Gualaceo' }]);
-    expect(prisma.client.findMany.mock.calls[0][0].where.interests).toEqual({ none: { propertyId: 'p1' } });
-    expect(interests.reconcileRecommendations.mock.calls[0][2]).toEqual({ mode: 'merge' });
+    // Marca de cliente: se reevalúa aunque ya tenga una recomendación IA (solo se excluyen los manuales)…
+    expect(prisma.client.findMany.mock.calls[0][0].where.interests).toEqual({
+      none: { propertyId: 'p1', source: 'manual' },
+    });
+    // …y solo se reemplazan las recomendaciones IA de los clientes que cambiaron.
+    expect(interests.reconcileRecommendations.mock.calls[0][2]).toEqual({ mode: 'replaceAi', scopeClientIds: ['n'] });
   });
 
   it('el botón manual fuerza modo full, reevalúa a los de la IA y los reemplaza (no los manuales)', async () => {
@@ -146,17 +150,23 @@ describe('RecommendationRunnerService', () => {
     expect(result.summary?.deleted).toBe(2);
   });
 
-  it('automático sin cambios en la propiedad y sin coincidencias no toca la lista', async () => {
+  it('cliente que cambió su interés y ya no coincide: se le quita la recomendación IA (solo a él)', async () => {
     const { runner, recommender, interests } = setup(
       { ...baseProperty, recommendationHash: currentHash, recommendationRunAt: new Date('2026-09-30T10:00:00Z') },
       [client('a', 'Busca casa en Quito')],
     );
     recommender.recommendCandidates.mockResolvedValue({ ok: true, calls: 1, candidates: [] });
 
+    interests.reconcileRecommendations.mockResolvedValue({
+      summary: { created: 0, updated: 0, deleted: 1, discarded: 0 },
+    });
+
     const result = await runner.run('p1', { trigger: 'scheduler' });
 
-    expect(result.status).toBe('no_candidates');
-    expect(interests.reconcileRecommendations).not.toHaveBeenCalled();
+    expect(result.mode).toBe('delta');
+    expect(interests.reconcileRecommendations.mock.calls[0][1]).toEqual([]);
+    expect(interests.reconcileRecommendations.mock.calls[0][2]).toEqual({ mode: 'replaceAi', scopeClientIds: ['a'] });
+    expect(result.summary?.deleted).toBe(1);
   });
 
   it('automático con propiedad o reglas cambiadas y sin coincidencias quita las recomendaciones IA previas', async () => {

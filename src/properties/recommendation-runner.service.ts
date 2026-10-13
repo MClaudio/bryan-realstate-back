@@ -138,9 +138,17 @@ export class RecommendationRunnerService {
       !property.recommendationRunAt || property.recommendationHash !== hash;
     const mode: RecommendationMode =
       force || propertyChanged ? 'full' : 'delta';
-    // Botón manual o propiedad/reglas cambiadas: se reevalúan también los interesados que puso la IA
-    // y luego se reemplazan (los manuales nunca se tocan). Si nada cambió solo se agregan/actualizan.
-    const reconcileMode = force || propertyChanged ? 'replaceAi' : 'merge';
+    // Siempre se reevalúan también los interesados que puso la IA y luego se reemplazan (los manuales
+    // y los calificados por el equipo nunca se tocan):
+    // - full (botón manual, propiedad o reglas cambiadas): todos los clientes de la propiedad.
+    // - delta (marca de cliente: interestUpdatedAt posterior a la última corrida): solo esos clientes;
+    //   se les agrega lo que ahora coincide y se les quita lo que ya no.
+    const reconcileMode = 'replaceAi' as const;
+    if (propertyChanged && !force && property.recommendationRunAt) {
+      this.logger.log(
+        `Recommendation ${options.trigger} for ${base.propertyCode}: huella cambiada (datos de la propiedad o reglas del recomendador), se reevalúa completa`,
+      );
+    }
 
     const clients = (
       await this.prisma.client.findMany({
@@ -149,11 +157,8 @@ export class RecommendationRunnerService {
             { interestDescription: { not: null } },
             { notes: { not: null } },
           ],
-          // Al reemplazar se reevalúan también los interesados IA (si no, se borrarían sin evaluar).
-          interests:
-            reconcileMode === 'replaceAi'
-              ? { none: { propertyId, source: InterestSource.manual } }
-              : { none: { propertyId } },
+          // Se reevalúan también los interesados IA (si no, se borrarían sin evaluar).
+          interests: { none: { propertyId, source: InterestSource.manual } },
           // Calificados por el equipo para esta propiedad: dislike = bloqueado, like = ya confirmado.
           recommendationFeedback: { none: { propertyId, deletedAt: null } },
           ...(mode === 'delta' && {
@@ -193,19 +198,9 @@ export class RecommendationRunnerService {
       });
     };
 
-    if (clients.length === 0 && reconcileMode === 'merge') {
-      await markRun();
-      return {
-        ...base,
-        status: 'no_candidates',
-        candidates: [],
-        summary: null,
-        error: null,
-        mode,
-        clientsEvaluated: 0,
-        aiCalls: 0,
-      };
-    }
+    // En delta solo se limpian las recomendaciones IA de los clientes reevaluados.
+    const scopeClientIds =
+      mode === 'delta' ? clients.map((c) => c.id) : undefined;
 
     this.logger.log(
       `Recommendation ${options.trigger} for ${base.propertyCode}: mode=${mode}, clients=${clients.length}`,
@@ -243,7 +238,10 @@ export class RecommendationRunnerService {
       name: names.get(c.client_id) ?? c.name,
     }));
 
-    const applied = await this.apply(base, candidates, persist, reconcileMode);
+    const applied = await this.apply(base, candidates, persist, {
+      mode: reconcileMode,
+      scopeClientIds,
+    });
     if (applied.status !== 'failed') await markRun();
     return {
       ...applied,
@@ -271,7 +269,7 @@ export class RecommendationRunnerService {
       },
       last.candidates,
       true,
-      'replaceAi',
+      { mode: 'replaceAi' },
     );
   }
 
@@ -320,12 +318,17 @@ export class RecommendationRunnerService {
     >,
     candidates: RecommendedCandidate[],
     persist: boolean,
-    reconcileMode: 'merge' | 'replaceAi',
+    reconcile: {
+      mode: 'merge' | 'replaceAi';
+      /** Solo se borran recomendaciones IA de estos clientes (corrida delta). */
+      scopeClientIds?: string[];
+    },
   ): Promise<RecommendationRunResult> {
-    // In automatic runs an empty answer never touches the list. With `replaceAi`
-    // (manual button) an empty answer removes the previous AI recommendations;
-    // interested clients registered by hand are never touched in either mode.
-    if (candidates.length === 0 && reconcileMode === 'merge') {
+    // With `merge` an empty answer never touches the list. With `replaceAi` an
+    // empty answer removes the previous AI recommendations (only of the scoped
+    // clients when a scope is given); interested clients registered by hand are
+    // never touched in either mode.
+    if (candidates.length === 0 && reconcile.mode === 'merge') {
       return {
         ...base,
         status: 'no_candidates',
@@ -349,7 +352,7 @@ export class RecommendationRunnerService {
         await this.propertyInterestsService.reconcileRecommendations(
           base.propertyId,
           candidates,
-          { mode: reconcileMode },
+          reconcile,
         );
       const s = {
         created: summary.created,
