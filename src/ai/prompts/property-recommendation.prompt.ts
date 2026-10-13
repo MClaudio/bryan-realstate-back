@@ -35,13 +35,17 @@ REGLAS ELIMINATORIAS (si se cumple cualquiera, NO incluyas al cliente):
    Cada cantón es distinto: quien busca en Chordeleg NO coincide con una propiedad en Gualaceo, ni
    quien busca en Cuenca con una en Paute, aunque el precio y el tipo coincidan.
 3. Área insuficiente: si el cliente pide un área mínima ("900 m2 en adelante", "mínimo 1000 metros",
-   "de 2000 m2"), la propiedad debe tenerla (terreno_m2; construccion_m2 si pide área de
+   "de 2000 m2", "mayor a 500 metros cuadrados", "más de 600 m2", "sobre los 800 m2", "desde 400 m2"),
+   la propiedad debe tenerla (terreno_m2; construccion_m2 si pide área de
    construcción o departamento). Busca 900 m2 y la propiedad tiene 462 m2 → NO.
 4. Requisito explícito incumplido: pide terreno plano y la topografía es Pendiente o Mixto; pide
    servicios básicos y no tiene; pide zona urbana y es rural; pide un uso (construir vivienda,
    agrícola, comercial) que la propiedad claramente no permite.
-5. El cliente no busca comprar/invertir (proveedores, dueños que venden, técnicos, clientes que ya
-   compraron sin nuevo interés, familiares o referencias sin interés propio).
+5. El cliente no busca COMPRAR o invertir. La recomendación es solo para compradores. NO incluyas a
+   quien VENDE u ofrece una propiedad ("tiene un terreno para vender", "vende su casa", "ofrece un
+   lote"), aunque su propiedad esté en el mismo sector o sea del mismo tipo: es un vendedor, no un
+   interesado. Tampoco a proveedores, técnicos, clientes que ya compraron sin nuevo interés,
+   familiares o referencias sin interés propio.
 
 EL PRECIO ES SECUNDARIO: nunca incluyas a un cliente solo porque el precio coincide. Primero deben
 coincidir tipo, ubicación y requisitos. No compares tú el precio: extrae el presupuesto en "b" y el
@@ -49,13 +53,17 @@ sistema lo verifica.
 
 Campos de salida para cada cliente incluido:
 - id: exactamente el id recibido. Nunca inventes ids.
+- q: intención del cliente. "COMPRA" busca comprar o invertir; "VENDE" vende u ofrece una propiedad;
+  "OTRO" cualquier otro caso. Solo "COMPRA" puede incluirse.
 - t: "SI" si el tipo coincide (si es "NO", no lo incluyas).
 - u: ubicación. "SI" coincide la ciudad/sector/cercanía pedida; "ND" el cliente no indica ubicación;
   "NO" no coincide (entonces no lo incluyas).
 - am: área mínima pedida por el cliente en m2, entero tal como aparece en su texto ("900m2 en
-  adelante" → 900, "de 2000 metros" → 2000); null si no pide área.
-- a: área. "SI" cumple el área pedida (también si está como máximo 10 % por debajo: el sistema
-  ajusta el nivel); "ND" el cliente no pide área; "NO" no cumple (entonces no lo incluyas).
+  adelante" → 900, "de 2000 metros" → 2000, "mayor a 500 metros cuadrados" → 500); null solo si
+  el cliente no menciona ninguna superficie.
+- a: área. Compara el número: "SI" solo si el área de la propiedad es MAYOR O IGUAL a "am" (o como
+  máximo 10 % por debajo: el sistema ajusta el nivel); "ND" el cliente no pide área; "NO" no cumple
+  (entonces no lo incluyas). 462 m2 NO es mayor a 500 m2.
 - p: otras preferencias (topografía plano/semiplano, servicios, zona, vista, uso: construir, cabaña,
   glamping, agrícola, inversión). "SI" cumple todas las que pide; "PARCIAL" cumple algunas y las
   demás no se pueden confirmar con los datos; "ND" no pide nada más; "NO" incumple alguna explícita
@@ -72,8 +80,12 @@ Ejemplos de lo que NO se recomienda:
   topografía Mixto, $35.000. → NO (área insuficiente y no es plano; el precio no basta).
 - Cliente: "terreno de 2000 m2 en Gualaceo para construcción". Propiedad: terreno 400 m2 en
   Gualaceo. → NO (área insuficiente).
+- Cliente: "terreno cerca de zona urbana de Gualaceo mayor a 500 metros cuadrados". Propiedad:
+  terreno 400 m2 en Gualaceo. → NO (400 no es mayor a 500).
 - Cliente: "terreno en Chordeleg hasta $50mil". Propiedad: terreno en Gualaceo, $50.000. → NO
   (ubicación distinta).
+- Cliente: "tiene un terreno para vender por el sector de El Progreso en Gualaceo". Propiedad:
+  terreno en El Progreso, Gualaceo. → NO (es vendedor, no comprador; coincidir en sector no importa).
 - Cliente: "casa con terreno en Gualaceo". Propiedad: Terreno sin casa en Gualaceo. → NO (tipo).
 
 APRENDIZAJE: puede llegar antes un mensaje {"aprendizaje": {incorrectas, correctas}} con recomendaciones
@@ -99,9 +111,14 @@ export const PROPERTY_RECOMMENDATION_SCHEMA = {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['id', 't', 'u', 'am', 'a', 'p', 'b', 's', 'r'],
+          required: ['id', 'q', 't', 'u', 'am', 'a', 'p', 'b', 's', 'r'],
           properties: {
             id: { type: 'string' },
+            q: {
+              type: 'string',
+              enum: ['COMPRA', 'VENDE', 'OTRO'],
+              description: 'Intención del cliente',
+            },
             t: {
               type: 'string',
               enum: ['SI', 'NO'],

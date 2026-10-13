@@ -89,7 +89,7 @@ const stableStringify = (value: unknown): string => {
  * Versión de las reglas del recomendador. Subirla cambia la huella de todas las propiedades, así el
  * cron las reevalúa completas y reemplaza las recomendaciones IA hechas con reglas anteriores.
  */
-export const RECOMMENDATION_RULES_VERSION = 2;
+export const RECOMMENDATION_RULES_VERSION = 4;
 
 export const computeRecommendationHash = (compactProperty: Record<string, unknown>): string =>
   createHash('sha256')
