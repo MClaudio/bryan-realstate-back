@@ -148,6 +148,71 @@ export const isSellerOnly = (client: AiRecommendationClient): boolean => {
   return SELLER_PATTERN.test(text) && !BUYER_PATTERN.test(text);
 };
 
+export type WantedType =
+  | 'casa'
+  | 'casa_terreno'
+  | 'terreno'
+  | 'departamento'
+  | 'finca';
+
+/**
+ * Tipos de propiedad que menciona el cliente ("Interesado en una casa" → casa).
+ * "casa con terreno/patio" cuenta como casa con terreno, no como terreno; "terreno para construir
+ * una casa" cuenta como terreno, no como casa. Vacío = el cliente no lo dice (decide la IA).
+ */
+export const clientWantedTypes = (
+  client: AiRecommendationClient,
+): Set<WantedType> => {
+  let text = ` ${client.i ?? ''} ${client.n ?? ''} `
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+  const wanted = new Set<WantedType>();
+  // "construir una casa", "hacer su casa": es el uso del terreno, no el tipo buscado.
+  text = text.replace(
+    /\b(construir|construccion de|edificar|hacer|levantar)\s+(una\s+|su\s+|la\s+|mi\s+)?(casa|vivienda)s?\b/g,
+    ' ',
+  );
+  const houseWithLand =
+    /\b(casas?|viviendas?)\s+(con|y)\s+(terrenos?|patio|jardin|lotes?)\b|\bterrenos?\s+con\s+(casa|vivienda)s?\b/g;
+  if (houseWithLand.test(text)) {
+    wanted.add('casa_terreno');
+    text = text.replace(houseWithLand, ' ');
+  }
+  if (/\b(casas?|viviendas?|villas?)\b/.test(text)) wanted.add('casa');
+  if (/\b(terrenos?|lotes?|solar(es)?)\b/.test(text)) wanted.add('terreno');
+  if (/\b(departamentos?|dptos?|suites?|apartamentos?)\b/.test(text))
+    wanted.add('departamento');
+  if (/\b(fincas?|quintas?|haciendas?)\b/.test(text)) wanted.add('finca');
+  return wanted;
+};
+
+/** Qué buscan los clientes compatibles con cada tipo de propiedad. */
+const COMPATIBLE_TYPES: Record<string, WantedType[]> = {
+  terreno: ['terreno'],
+  lote: ['terreno'],
+  'casa y terreno': ['casa_terreno', 'casa'],
+  casa: ['casa', 'casa_terreno'],
+  departamento: ['departamento'],
+  finca: ['finca', 'terreno'],
+};
+
+/**
+ * false solo cuando el cliente dice qué tipo busca y ninguno es compatible con la propiedad
+ * (busca casa y la propiedad es un terreno). Sin tipo claro, no se descarta aquí.
+ */
+export const isTypeCompatible = (
+  propertyType: unknown,
+  client: AiRecommendationClient,
+): boolean => {
+  const type =
+    typeof propertyType === 'string' ? propertyType.toLowerCase().trim() : '';
+  const accepted = COMPATIBLE_TYPES[type];
+  const wanted = clientWantedTypes(client);
+  if (!accepted || wanted.size === 0) return true;
+  return accepted.some((t) => wanted.has(t));
+};
+
 /** Área de la propiedad que se compara con el mínimo del cliente (null = no se puede verificar). */
 const propertyArea = (property: Record<string, unknown>): number | null => {
   const type =
@@ -209,13 +274,15 @@ export class PropertyRecommendationAiService {
   ): Promise<AiRecommendationResult> {
     const unavailable = this.getUnavailableReason();
     if (unavailable) return { ok: false, ...unavailable };
-    // Quien solo vende (sin intención de compra) nunca se recomienda: ni se envía a la IA.
-    const buyers = clients.filter((c) => !isSellerOnly(c));
-    if (buyers.length < clients.length)
+    // Quien solo vende o busca otro tipo de propiedad nunca se recomienda: ni se envía a la IA.
+    const eligible = clients.filter(
+      (c) => !isSellerOnly(c) && isTypeCompatible(property.tipo, c),
+    );
+    if (eligible.length < clients.length)
       this.logger.log(
-        `Recomendación IA: ${clients.length - buyers.length} cliente(s) que solo venden fueron excluidos`,
+        `Recomendación IA: ${clients.length - eligible.length} cliente(s) excluidos por vender o buscar otro tipo de propiedad`,
       );
-    clients = buyers;
+    clients = eligible;
     if (clients.length === 0) return { ok: true, matches: [], calls: 0 };
 
     const { batchSize, minScore } = this.config.recommendation;
@@ -313,6 +380,8 @@ export class PropertyRecommendationAiService {
       const a = flag(raw.a, ['SI', 'NO', 'ND'] as const) ?? 'ND';
       const p = flag(raw.p, ['SI', 'PARCIAL', 'NO', 'ND'] as const) ?? 'ND';
       if (t !== 'SI' || !u || u === 'NO' || a === 'NO' || p === 'NO') continue;
+      // El tipo también se verifica en código: la IA a veces marca "SI" aunque diga lo contrario.
+      if (!isTypeCompatible(property.tipo, client)) continue;
 
       const known = this.clientNumbers(client);
       let level: AiInterestLevel = 'ALTO';
