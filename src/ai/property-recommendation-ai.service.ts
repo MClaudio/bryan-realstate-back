@@ -94,7 +94,61 @@ const flag = <T extends string>(
   return (allowed as readonly string[]).includes(text) ? (text as T) : null;
 };
 
-/** Área de la propiedad que se compara con el mínimo del cliente (null = no se verifica en código). */
+/** "500 m2", "1.200 metros cuadrados", "2 hectáreas"… (número + unidad de superficie). */
+const AREA_PATTERN =
+  /(\d[\d.,]*)\s*(m2|m²|mts2|mts|metros(?:\s+cuadrados)?|hect[aá]reas?|ha\b)/gi;
+/** Antes del número: es un máximo, no un mínimo ("hasta 1000 m2"). */
+const AREA_MAX_BEFORE = /(hasta|m[aá]ximo|menos\s+de|no\s+m[aá]s\s+de)\s*$/i;
+/** Antes del número: es una distancia ("a 200 metros de la vía"), salvo "mayor a 500 metros". */
+const AREA_DISTANCE_BEFORE = /\ba\s*$/i;
+const AREA_COMPARISON_BEFORE = /(mayor|superior|igual)\s+a\s*$/i;
+
+/** Áreas en m² que aparecen en un texto, ignorando distancias y (opcionalmente) máximos. */
+const areasInText = (text: string, skipMaximums: boolean): number[] => {
+  const areas: number[] = [];
+  for (const match of text.matchAll(AREA_PATTERN)) {
+    const before = text.slice(Math.max(0, match.index - 30), match.index);
+    if (skipMaximums && AREA_MAX_BEFORE.test(before)) continue;
+    if (
+      AREA_DISTANCE_BEFORE.test(before) &&
+      !AREA_COMPARISON_BEFORE.test(before)
+    )
+      continue;
+    const hectares = /^h/i.test(match[2]);
+    const value = hectares
+      ? Number(match[1].replace(/\./g, '').replace(',', '.')) * 10_000
+      : Number(match[1].replace(/[.,]/g, ''));
+    if (Number.isFinite(value) && value > 0) areas.push(Math.round(value));
+  }
+  return areas;
+};
+
+/** Área mínima que pide el cliente leída de su texto (la menor cifra de superficie que no sea un máximo). */
+export const clientMinArea = (
+  client: AiRecommendationClient,
+): number | null => {
+  const areas = areasInText(`${client.i ?? ''} ${client.n ?? ''}`, true);
+  return areas.length > 0 ? Math.min(...areas) : null;
+};
+
+const SELLER_PATTERN =
+  /\b(para (la )?venta|para vender|en venta|quiere vender|desea vender|busca vender|necesita vender|vende (un|una|su|sus|el|la)|esta vendiendo|vendiendo|ofrece (un|una|su)|ofrece en venta)\b/;
+const BUYER_PATTERN =
+  /\b(comprar|compra (un|una|de)|adquirir|invertir|inversion|busca(ndo)? (un|una|terrenos?|casas?|lotes?|departamentos?|fincas?|quintas?|propiedad(es)?)|interesad[oa] en|necesita (un|una|terreno|casa|lote))\b/;
+
+/**
+ * Cliente que solo vende (ej. "Tiene un terreno para vender en El Progreso"): no es comprador.
+ * Si además expresa intención de compra ("vende su casa y busca terreno") lo decide la IA.
+ */
+export const isSellerOnly = (client: AiRecommendationClient): boolean => {
+  const text = `${client.i ?? ''} ${client.n ?? ''}`
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+  return SELLER_PATTERN.test(text) && !BUYER_PATTERN.test(text);
+};
+
+/** Área de la propiedad que se compara con el mínimo del cliente (null = no se puede verificar). */
 const propertyArea = (property: Record<string, unknown>): number | null => {
   const type =
     typeof property.tipo === 'string' ? property.tipo.toLowerCase() : '';
@@ -104,9 +158,14 @@ const propertyArea = (property: Record<string, unknown>): number | null => {
       ? property.construccion_m2
       : null;
   const area = Number(raw);
-  return raw !== null && raw !== undefined && Number.isFinite(area) && area > 0
-    ? area
-    : null;
+  if (raw !== null && raw !== undefined && Number.isFinite(area) && area > 0)
+    return area;
+  // Terreno sin terreno_m2 cargado: se toma el área escrita en características/observaciones.
+  if (!LAND_TYPES.has(type)) return null;
+  const text = [property.caracteristicas, property.observaciones]
+    .filter((v): v is string => typeof v === 'string')
+    .join(' ');
+  return areasInText(text, false)[0] ?? null;
 };
 
 /**
@@ -150,6 +209,13 @@ export class PropertyRecommendationAiService {
   ): Promise<AiRecommendationResult> {
     const unavailable = this.getUnavailableReason();
     if (unavailable) return { ok: false, ...unavailable };
+    // Quien solo vende (sin intención de compra) nunca se recomienda: ni se envía a la IA.
+    const buyers = clients.filter((c) => !isSellerOnly(c));
+    if (buyers.length < clients.length)
+      this.logger.log(
+        `Recomendación IA: ${clients.length - buyers.length} cliente(s) que solo venden fueron excluidos`,
+      );
+    clients = buyers;
     if (clients.length === 0) return { ok: true, matches: [], calls: 0 };
 
     const { batchSize, minScore } = this.config.recommendation;
@@ -239,6 +305,9 @@ export class PropertyRecommendationAiService {
       if (!detail) continue;
 
       // Reglas eliminatorias: tipo y ubicación son obligatorios; ningún requisito explícito puede fallar.
+      // Solo compradores/inversionistas: quien vende, ofrece o no tiene interés propio se descarta.
+      if (flag(raw.q, ['COMPRA', 'VENDE', 'OTRO'] as const) !== 'COMPRA')
+        continue;
       const t = flag(raw.t, ['SI', 'NO'] as const);
       const u = flag(raw.u, ['SI', 'NO', 'ND'] as const);
       const a = flag(raw.a, ['SI', 'NO', 'ND'] as const) ?? 'ND';
@@ -253,8 +322,10 @@ export class PropertyRecommendationAiService {
       if (u === 'SI') coincide.push('ubicación');
       else level = minLevel(level, 'MEDIO');
 
-      // Área: verificada en código cuando el mínimo aparece en el texto del cliente.
-      const minArea = this.trustedNumber(raw.am, known);
+      // Área: siempre verificada en código. El mínimo sale de la IA (si está en el texto del cliente)
+      // o se lee directamente del texto ("mayor a 500 metros cuadrados" → 500).
+      const minArea =
+        this.trustedNumber(raw.am, known) ?? clientMinArea(client);
       if (minArea && area) {
         if (area < minArea * AREA_RULES.toleranceMin) continue;
         if (area < minArea) {
@@ -265,6 +336,12 @@ export class PropertyRecommendationAiService {
         } else {
           coincide.push('área');
         }
+      } else if (minArea) {
+        // Pide un área y la propiedad no la tiene registrada: no se puede afirmar que coincide.
+        level = minLevel(level, 'MEDIO');
+        notes.push(
+          `No se pudo verificar el área (pide desde ${formatM2(minArea)}).`,
+        );
       } else if (a === 'SI') {
         coincide.push('área');
       }

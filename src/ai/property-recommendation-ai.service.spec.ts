@@ -1,4 +1,4 @@
-import { PropertyRecommendationAiService } from './property-recommendation-ai.service';
+import { PropertyRecommendationAiService, clientMinArea, isSellerOnly } from './property-recommendation-ai.service';
 import type { AiConfig } from './ai.config';
 
 const buildConfig = (overrides: Partial<AiConfig['recommendation']> = {}): AiConfig => ({
@@ -32,6 +32,7 @@ const reply = (c: unknown[]) => ({ choices: [{ message: { content: JSON.stringif
 /** Coincidencia tal como la devuelve la IA: por defecto tipo y ubicación coinciden y no pide nada más. */
 const hit = (id: string, s: number, r: string, extra: Record<string, unknown> = {}) => ({
   id,
+  q: 'COMPRA',
   t: 'SI',
   u: 'SI',
   am: null,
@@ -257,6 +258,55 @@ describe('PropertyRecommendationAiService', () => {
       expect(match.reason).toBe('Coincide en: tipo, ubicación. Terreno en Gualaceo.');
     });
 
+    describe('área mínima leída del texto aunque la IA no la extraiga (am = null)', () => {
+      const text = 'Busca terreno cerca de zona urbana de Gualaceo mayor a 500 metros cuadrados';
+      const aiSaysOk = { am: null, a: 'SI', p: 'SI' };
+
+      it('"mayor a 500 metros cuadrados" frente a 462 m² → no es ALTO: BAJO por tolerancia y sin "área" en coincidencias', async () => {
+        const [match] = await run(text, aiSaysOk);
+        expect(match.interest_level).toBe('BAJO');
+        expect(match.reason).toMatch(/^Coincide en: tipo, ubicación, características\./);
+        expect(match.reason).toContain('tolerancia del 10 % del mínimo pedido (500 m²)');
+      });
+
+      it('"mayor a 500" frente a 400 m² → no se recomienda', async () => {
+        expect(await run(text, aiSaysOk, { ...elProgreso, terreno_m2: 400 })).toEqual([]);
+      });
+
+      it('si terreno_m2 no está cargado, usa el área escrita en las características', async () => {
+        const { terreno_m2: _omit, ...sinArea } = elProgreso;
+        const target = { ...sinArea, caracteristicas: 'Con un área de 400 metros cuadrados delimitados, a pocos metros de la Y' };
+        expect(await run(text, aiSaysOk, target)).toEqual([]);
+      });
+
+      it('si la propiedad no tiene área en ningún lado → como máximo MEDIO y lo explica', async () => {
+        const { terreno_m2: _omit, ...sinArea } = elProgreso;
+        const [match] = await run(text, aiSaysOk, sinArea);
+        expect(match.interest_level).toBe('MEDIO');
+        expect(match.reason).toContain('No se pudo verificar el área (pide desde 500 m²)');
+      });
+    });
+
+    it('cliente que vende (q = VENDE u OTRO o sin q) → no se recomienda aunque coincida el sector', async () => {
+      const text = 'Busca terreno en Gualaceo';
+      expect(await run(text, { q: 'VENDE' })).toEqual([]);
+      expect(await run(text, { q: 'OTRO' })).toEqual([]);
+      expect(await run(text, { q: undefined })).toEqual([]);
+    });
+
+    it('cliente que solo vende ni se envía a la IA', async () => {
+      const service = new PropertyRecommendationAiService(buildConfig({ minScore: 40 }));
+      const create = mockCreate(service, jest.fn().mockResolvedValue(reply([])));
+      const seller = { id: 's', i: 'Tiene un terreno para vender por el sector de el progreso en gualaceo' };
+      const buyer = { id: 'b', i: 'Busca terreno en Gualaceo' };
+
+      await service.recommend(elProgreso, [seller, buyer]);
+      expect(JSON.parse(create.mock.calls[0][0].messages[1].content).clientes).toEqual([buyer]);
+
+      expect(await service.recommend(elProgreso, [seller])).toEqual({ ok: true, matches: [], calls: 0 });
+      expect(create).toHaveBeenCalledTimes(1);
+    });
+
     it('cliente sin ubicación indicada → como máximo MEDIO', async () => {
       const [match] = await run('Busca terreno', { u: 'ND' }, elProgreso, 95);
       expect(match).toMatchObject({ interest_level: 'MEDIO', score: 79 });
@@ -288,5 +338,38 @@ describe('PropertyRecommendationAiService', () => {
 
     expect(await service.recommend(property, clients)).toMatchObject({ ok: false, reason: 'disabled' });
     expect(create).not.toHaveBeenCalled();
+  });
+});
+
+describe('clientMinArea', () => {
+  const min = (i: string) => clientMinArea({ id: 'x', i });
+
+  it('lee el mínimo en sus distintas formas', () => {
+    expect(min('terreno mayor a 500 metros cuadrados')).toBe(500);
+    expect(min('terreno plano de 900m2 en adelante')).toBe(900);
+    expect(min('lote de 1.500 m2')).toBe(1500);
+    expect(min('finca de 2 hectáreas')).toBe(20000);
+  });
+
+  it('ignora máximos, distancias y textos sin superficie', () => {
+    expect(min('terreno hasta 1000 m2')).toBeNull();
+    expect(min('terreno a 200 metros de la vía')).toBeNull();
+    expect(min('terreno en Gualaceo hasta 35mil')).toBeNull();
+  });
+});
+
+describe('isSellerOnly', () => {
+  const seller = (i: string) => isSellerOnly({ id: 'x', i });
+
+  it('detecta a quien solo vende u ofrece', () => {
+    expect(seller('Tiene un terreno para vender por el sector de el progreso en gualaceo')).toBe(true);
+    expect(seller('Vende una casa en Paute')).toBe(true);
+    expect(seller('Ofrece un lote en Chordeleg, quiere vender pronto')).toBe(true);
+  });
+
+  it('no excluye compradores, aunque mencionen una venta', () => {
+    expect(seller('Busca terreno en Gualaceo hasta 35mil')).toBe(false);
+    expect(seller('Vende su casa en Cuenca y busca un terreno en Gualaceo')).toBe(false);
+    expect(seller('Quiere comprar un lote que esté en venta cerca del centro')).toBe(false);
   });
 });
