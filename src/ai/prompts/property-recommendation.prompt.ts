@@ -30,6 +30,8 @@ REGLAS ELIMINATORIAS (si se cumple cualquiera, NO incluyas al cliente):
    - "Finca": clientes que buscan finca, quinta, hacienda o terreno agrícola/campo amplio.
    - Si el cliente acepta varios tipos (ej. "terreno o casa"), es compatible con cualquiera.
    - Si el cliente no indica tipo, NO lo incluyas.
+   - "Interesado en una casa" frente a un Terreno → t = "NO": no lo incluyas, aunque coincidan la
+     ciudad o el precio. Si tu motivo diría "busca una casa, pero es un terreno", el cliente NO va.
 2. Ubicación distinta: si el cliente indica ciudad, cantón, parroquia o sector, la propiedad debe
    estar ahí o en la cercanía que el cliente acepta ("cerca de Gualaceo", "a 10 minutos del centro").
    Cada cantón es distinto: quien busca en Chordeleg NO coincide con una propiedad en Gualaceo, ni
@@ -87,6 +89,8 @@ Ejemplos de lo que NO se recomienda:
 - Cliente: "tiene un terreno para vender por el sector de El Progreso en Gualaceo". Propiedad:
   terreno en El Progreso, Gualaceo. → NO (es vendedor, no comprador; coincidir en sector no importa).
 - Cliente: "casa con terreno en Gualaceo". Propiedad: Terreno sin casa en Gualaceo. → NO (tipo).
+- Cliente: "Interesado en una casa". Propiedad: terreno plano de 421 m2 en Chiquintur, Gualaceo. → NO
+  (busca casa, no terreno).
 
 APRENDIZAJE: puede llegar antes un mensaje {"aprendizaje": {incorrectas, correctas}} con recomendaciones
 calificadas por el equipo inmobiliario (propiedad, lo que busca el cliente, lo que dijo la IA, motivo y

@@ -1,4 +1,9 @@
-import { PropertyRecommendationAiService, clientMinArea, isSellerOnly } from './property-recommendation-ai.service';
+import {
+  PropertyRecommendationAiService,
+  clientMinArea,
+  isSellerOnly,
+  isTypeCompatible,
+} from './property-recommendation-ai.service';
 import type { AiConfig } from './ai.config';
 
 const buildConfig = (overrides: Partial<AiConfig['recommendation']> = {}): AiConfig => ({
@@ -47,7 +52,7 @@ const hit = (id: string, s: number, r: string, extra: Record<string, unknown> = 
 const property = { tipo: 'Terreno', ciudad: 'Gualaceo', precio: 78000 };
 const clients = [
   { id: 'a', i: 'Busca terreno en Gualaceo' },
-  { id: 'b', i: 'Busca casa en Cuenca' },
+  { id: 'b', i: 'Busca terreno en Cuenca' },
   { id: 'c', i: 'Busca terreno grande' },
 ];
 
@@ -307,6 +312,26 @@ describe('PropertyRecommendationAiService', () => {
       expect(create).toHaveBeenCalledTimes(1);
     });
 
+    it('caso Chiquintur: "Interesado en una casa" frente a un terreno → no se recomienda aunque la IA diga t = SI', async () => {
+      const service = new PropertyRecommendationAiService(buildConfig({ minScore: 40 }));
+      const create = mockCreate(service, jest.fn().mockResolvedValue(reply([])));
+      expect(await service.recommend(elProgreso, [{ id: 'x', i: 'Interesado en una casa' }])).toEqual({
+        ok: true,
+        matches: [],
+        calls: 0,
+      });
+      expect(create).not.toHaveBeenCalled();
+
+      // Y si la IA lo devolviera igual, la validación también lo descarta.
+      const out = service.validate(
+        { c: [hit('x', 70, 'Busca una casa, pero la propiedad es un terreno', { u: 'ND' })] },
+        [{ id: 'x', i: 'Interesado en una casa' }],
+        40,
+        elProgreso,
+      );
+      expect(out).toEqual([]);
+    });
+
     it('cliente sin ubicación indicada → como máximo MEDIO', async () => {
       const [match] = await run('Busca terreno', { u: 'ND' }, elProgreso, 95);
       expect(match).toMatchObject({ interest_level: 'MEDIO', score: 79 });
@@ -371,5 +396,29 @@ describe('isSellerOnly', () => {
     expect(seller('Busca terreno en Gualaceo hasta 35mil')).toBe(false);
     expect(seller('Vende su casa en Cuenca y busca un terreno en Gualaceo')).toBe(false);
     expect(seller('Quiere comprar un lote que esté en venta cerca del centro')).toBe(false);
+  });
+});
+
+describe('isTypeCompatible', () => {
+  const ok = (tipo: string, i: string) => isTypeCompatible(tipo, { id: 'x', i });
+
+  it('descarta cuando el cliente pide otro tipo', () => {
+    expect(ok('Terreno', 'Interesado en una casa')).toBe(false);
+    expect(ok('Terreno', 'Busca casa con terreno en Gualaceo')).toBe(false);
+    expect(ok('Lote', 'Busca departamento en Cuenca')).toBe(false);
+    expect(ok('Casa y terreno', 'Busca terreno para invertir')).toBe(false);
+    expect(ok('Departamento', 'Busca casa')).toBe(false);
+  });
+
+  it('acepta el mismo tipo, varios tipos o uso para construir', () => {
+    expect(ok('Terreno', 'Busca terreno para construir una casa')).toBe(true);
+    expect(ok('Terreno', 'Busca casa o terreno en Gualaceo')).toBe(true);
+    expect(ok('Casa y terreno', 'Busca casa con patio')).toBe(true);
+    expect(ok('Casa', 'Busca una vivienda en Paute')).toBe(true);
+    expect(ok('Finca', 'Busca terreno amplio para agricultura')).toBe(true);
+  });
+
+  it('si el cliente no dice el tipo, no descarta (lo decide la IA)', () => {
+    expect(ok('Terreno', 'Busca algo en Gualaceo hasta 40mil')).toBe(true);
   });
 });
