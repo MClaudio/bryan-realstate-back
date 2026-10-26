@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import aiConfig from './ai.config';
 import { ContactAiParserService } from './contact-ai-parser.service';
 import { PropertyDescriptionAiService } from './property-description-ai.service';
-import { PropertyRecommendationAiService } from './property-recommendation-ai.service';
+import { ClientCriteriaAiService } from './client-criteria-ai.service';
 import { OpenAiUsageService } from './openai-usage.service';
 import { AiController } from './ai.controller';
 
@@ -13,9 +13,9 @@ import { AiController } from './ai.controller';
   providers: [
     ContactAiParserService,
     PropertyDescriptionAiService,
-    PropertyRecommendationAiService,
+    ClientCriteriaAiService,
     OpenAiUsageService,
   ],
-  exports: [ContactAiParserService, PropertyDescriptionAiService, PropertyRecommendationAiService],
+  exports: [ContactAiParserService, PropertyDescriptionAiService, ClientCriteriaAiService],
 })
 export class AiModule {}

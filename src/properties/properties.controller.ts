@@ -33,37 +33,6 @@ export class PropertiesController {
     return this.propertiesService.generatePublicDescriptions(dto);
   }
 
-  @Post(':id/recommendations')
-  @UseGuards(JwtAuthGuard)
-  recommendForProperty(
-    @Param('id') id: string,
-    @Req() req: any,
-    @Body() body?: { enqueue?: boolean; persist?: boolean },
-  ) {
-    // Background by default: a synchronous run with many clients outlasts the HTTP timeout.
-    const enqueue = body?.enqueue !== false;
-    const persist = body?.persist === false ? false : true;
-    const userId = this.getUserId(req);
-    return this.propertiesService.recommendForProperty(id, {
-      enqueue,
-      persist,
-      userId,
-    });
-  }
-
-  /** Latest stored AI recommendation that can be restored without calling n8n. */
-  @Get(':id/recommendations/last')
-  @UseGuards(JwtAuthGuard)
-  lastRecommendation(@Param('id') id: string) {
-    return this.propertiesService.lastRecommendationInfo(id);
-  }
-
-  @Post(':id/recommendations/restore-last')
-  @UseGuards(JwtAuthGuard)
-  restoreLastRecommendation(@Param('id') id: string) {
-    return this.propertiesService.restoreLastRecommendation(id);
-  }
-
   @Post()
   @UseGuards(JwtAuthGuard)
   create(@Body() createPropertyDto: CreatePropertyDto, @Req() req: any) {

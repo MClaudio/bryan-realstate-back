@@ -3,10 +3,9 @@ import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { PropertyStatus, FileType, Prisma } from '@prisma/client';
-import { RecommendationQueueService } from './recommendation-queue.service';
+import { RecommendationsQueueService } from '../recommendations/recommendations-queue.service';
 import { FilesService } from '../files/files.service';
 import { propertyInclude } from './property-include';
-import { RecommendationRunnerService } from './recommendation-runner.service';
 import { newSaleProcessCreate } from '../sale-processes/sale-process.rules';
 import { PropertyDescriptionAiService } from '../ai/property-description-ai.service';
 import { GeneratePropertyDescriptionsDto } from './dto/generate-property-descriptions.dto';
@@ -27,23 +26,10 @@ export class PropertiesService {
 
   constructor(
     private prisma: PrismaService,
-    private readonly recommendationQueueService: RecommendationQueueService,
-    private readonly recommendationRunner: RecommendationRunnerService,
+    private readonly recommendationsQueue: RecommendationsQueueService,
     private readonly filesService: FilesService,
     private readonly propertyDescriptionAi: PropertyDescriptionAiService,
   ) { }
-
-  /**
-   * Solo se encola la recomendación IA si la propiedad está en Nuevo y cambiaron los datos
-   * que usa la IA (fotos, redes, precio mínimo, comisión, etc. no cuentan).
-   */
-  private shouldQueueRecommendation(property: Parameters<RecommendationRunnerService['computeHash']>[0] & {
-    status: PropertyStatus;
-    recommendationHash: string | null;
-  }): boolean {
-    if (property.status !== PropertyStatus.Nuevo) return false;
-    return this.recommendationRunner.computeHash(property) !== property.recommendationHash;
-  }
 
   /** Genera con IA las descripciones públicas a partir de los datos del formulario (no guarda). */
   async generatePublicDescriptions(dto: GeneratePropertyDescriptionsDto) {
@@ -220,26 +206,12 @@ export class PropertiesService {
       include: propertyInclude,
     });
 
-    let recommendationJobId: string = "";
-    let recommendationQueued = false;
-    if (this.shouldQueueRecommendation(property)) {
-      recommendationJobId = await this.recommendationQueueService.enqueueRecommendation({
-        propertyId: property.id,
-        userId,
-        trigger: 'create',
-      });
-      recommendationQueued = true;
-    }
+    // Recomendaciones por reglas (sin IA): se recalculan en segundo plano.
+    await this.recommendationsQueue.enqueueProperty(property.id, 'create', userId);
 
     this.scheduleAutoDescriptions(property.id);
 
-    const enriched = await this.enrichPropertyFiles(property);
-    return {
-      ...enriched,
-      recommendationQueued,
-      recommendationJobId,
-      recommendedCandidates: [],
-    };
+    return this.enrichPropertyFiles(property);
   }
 
   async findAll() {
@@ -298,50 +270,6 @@ export class PropertiesService {
     }
 
     return this.enrichPropertyFiles(property);
-  }
-
-  async recommendForProperty(id: string, options?: { persist?: boolean; enqueue?: boolean; userId?: string }) {
-    const persist = options?.persist ?? true;
-    const enqueue = options?.enqueue ?? false;
-    const userId = options?.userId ?? '';
-
-    if (enqueue) {
-      await this.findOne(id);
-      const { jobId, alreadyRunning } =
-        await this.recommendationQueueService.enqueueManualRecommendation(id, userId);
-      return {
-        propertyId: id,
-        recommendationQueued: !alreadyRunning,
-        recommendationAlreadyRunning: alreadyRunning,
-        recommendationJobId: jobId,
-        recommendedCandidates: [],
-      };
-    }
-
-    const result = await this.recommendationRunner.run(id, { trigger: 'manual', persist });
-    return {
-      propertyId: id,
-      recommendationQueued: false,
-      status: result.status,
-      recommendedCandidates: result.candidates,
-      reconcile: result.summary ? { summary: result.summary } : null,
-      error: result.error,
-    };
-  }
-
-  lastRecommendationInfo(id: string) {
-    return this.recommendationRunner.lastRecommendationInfo(id);
-  }
-
-  async restoreLastRecommendation(id: string) {
-    const result = await this.recommendationRunner.restoreLast(id);
-    return {
-      propertyId: id,
-      status: result.status,
-      recommendedCandidates: result.candidates,
-      reconcile: result.summary ? { summary: result.summary } : null,
-      error: result.error,
-    };
   }
 
   async update(id: string, updatePropertyDto: UpdatePropertyDto, userId: string) {
@@ -424,26 +352,12 @@ export class PropertiesService {
 
     console.log('Updated property with files:', updatedProperty.files?.length || 0);
 
-    let recommendationJobId: string = "";
-    let recommendationQueued = false;
-    if (this.shouldQueueRecommendation(updatedProperty)) {
-      recommendationJobId = await this.recommendationQueueService.enqueueRecommendation({
-        propertyId: id,
-        userId,
-        trigger: 'update',
-      });
-      recommendationQueued = true;
-    }
+    // Solo recalcula si cambiaron los datos que usa el matching (lo decide la huella).
+    await this.recommendationsQueue.enqueueProperty(id, 'update', userId);
 
     this.scheduleAutoDescriptions(id);
 
-    const enriched = await this.enrichPropertyFiles(updatedProperty);
-    return {
-      ...enriched,
-      recommendationQueued,
-      recommendationJobId,
-      recommendedCandidates: [],
-    };
+    return this.enrichPropertyFiles(updatedProperty);
   }
 
   // Soft delete: the row, its files, processes, interests and checklist stay in
@@ -452,10 +366,13 @@ export class PropertiesService {
     const property = await this.prisma.property.findFirst({ where: { id, deletedAt: null } });
     if (!property) throw new NotFoundException(`Property with ID ${id} not found`);
 
-    return this.prisma.property.update({
+    const deleted = await this.prisma.property.update({
       where: { id },
       data: { deletedAt: new Date(), isActive: false },
     });
+    // Eliminada: se quitan sus recomendaciones.
+    await this.recommendationsQueue.enqueueProperty(id, 'update');
+    return deleted;
   }
 
   async resolveMapsUrl(url: string): Promise<{ latitude: string; longitude: string; resolvedUrl: string }> {
