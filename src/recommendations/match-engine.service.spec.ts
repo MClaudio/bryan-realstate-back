@@ -74,7 +74,10 @@ const setup = (
       findUnique: jest.fn().mockResolvedValue(row),
       update: jest.fn().mockResolvedValue({}),
     },
-    clientCriteria: { findMany: jest.fn().mockResolvedValue(candidates) },
+    clientCriteria: {
+      findMany: jest.fn().mockResolvedValue(candidates),
+      count: jest.fn().mockResolvedValue(candidates.length),
+    },
     propertyMatch: {
       findMany: jest.fn().mockResolvedValue(existing),
       deleteMany: jest.fn().mockResolvedValue({ count: 3 }),
