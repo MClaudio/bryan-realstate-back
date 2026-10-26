@@ -1,4 +1,10 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnApplicationBootstrap,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
@@ -28,10 +34,13 @@ export interface SyncSummary {
  * Cambiar el prompt, el parser o las reglas recalcula todo solo.
  */
 @Injectable()
-export class RecommendationsSchedulerService implements OnModuleInit {
+export class RecommendationsSchedulerService
+  implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy
+{
   private readonly logger = new Logger(RecommendationsSchedulerService.name);
   private readonly cronJobName = 'recommendations-sync';
   private running = false;
+  private startupTimer: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly configService: ConfigService,
@@ -81,6 +90,55 @@ export class RecommendationsSchedulerService implements OnModuleInit {
     );
   }
 
+  /**
+   * Al arrancar (p. ej. tras un despliegue) se sincroniza una vez, sin esperar al próximo cron:
+   * lee los criterios de clientes nuevos o cambiados y recalcula lo afectado. Si nada cambió no hace
+   * nada. Se desactiva con RECOMMENDER_SYNC_ON_START=false.
+   */
+  onApplicationBootstrap(): void {
+    if (
+      this.configService.get<string>('RECOMMENDER_SYNC_ENABLED') === 'false' ||
+      this.configService.get<string>('RECOMMENDER_SYNC_ON_START') === 'false'
+    )
+      return;
+    const delayMs = Number(
+      this.configService.get<string>('RECOMMENDER_SYNC_START_DELAY_MS') ||
+        30_000,
+    );
+    this.startupTimer = setTimeout(() => {
+      this.startupTimer = null;
+      this.logger.log('Sincronización de recomendaciones al arrancar');
+      this.runSync().catch((err: unknown) =>
+        this.logger.error(
+          `Sincronización al arrancar falló: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
+    }, delayMs);
+  }
+
+  onModuleDestroy(): void {
+    if (this.startupTimer) clearTimeout(this.startupTimer);
+  }
+
+  /**
+   * Lanza la sincronización en segundo plano (puede tardar minutos con muchos clientes) y avisa
+   * al usuario con una notificación al terminar.
+   */
+  startInBackground(userId: string | null): {
+    started: boolean;
+    alreadyRunning: boolean;
+  } {
+    if (this.running) return { started: false, alreadyRunning: true };
+    void this.runSync()
+      .then((summary) => this.notifier.notifySyncFinished(userId, summary))
+      .catch((err: unknown) =>
+        this.logger.error(
+          `Sincronización manual falló: ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
+    return { started: true, alreadyRunning: false };
+  }
+
   async runSync(): Promise<SyncSummary> {
     const summary: SyncSummary = {
       extracted: 0,
@@ -101,14 +159,27 @@ export class RecommendationsSchedulerService implements OnModuleInit {
     this.running = true;
     try {
       // 1. Criterios de clientes nuevos o cambiados (o leídos con otra versión del extractor).
-      const toExtract =
-        await this.criteriaService.findClientsNeedingExtraction();
-      if (toExtract.length > 0) {
-        const extraction = await this.criteriaService.extractClients(toExtract);
-        summary.extracted = extraction.extracted;
-        summary.byRules = extraction.byRules;
-        summary.byAi = extraction.byAi;
-        summary.aiCalls = extraction.aiCalls;
+      // Un fallo aquí no impide recalcular con los criterios que ya existen.
+      try {
+        const toExtract =
+          await this.criteriaService.findClientsNeedingExtraction();
+        this.logger.log(
+          `Sincronización de recomendaciones: ${toExtract.length} cliente(s) por leer`,
+        );
+        if (toExtract.length > 0) {
+          const extraction =
+            await this.criteriaService.extractClients(toExtract);
+          summary.extracted = extraction.extracted;
+          summary.byRules = extraction.byRules;
+          summary.byAi = extraction.byAi;
+          summary.aiCalls = extraction.aiCalls;
+          summary.errors += extraction.errors;
+        }
+      } catch (error) {
+        summary.errors += 1;
+        this.logger.error(
+          `Leer criterios de clientes falló: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
 
       // 2. Propiedades con datos o reglas cambiadas: recalculan todos sus clientes.

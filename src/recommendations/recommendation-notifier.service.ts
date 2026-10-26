@@ -46,6 +46,40 @@ export class RecommendationNotifierService {
     );
   }
 
+  /** Resultado de una sincronización lanzada a mano (botón "Sincronizar recomendaciones"). */
+  async notifySyncFinished(
+    userId: string | null,
+    summary: {
+      extracted: number;
+      byAi: number;
+      propertiesRecomputed: number;
+      clientsRecomputed: number;
+      created: number;
+      deleted: number;
+      errors: number;
+    },
+  ): Promise<void> {
+    if (!userId) return;
+    try {
+      await this.notifications.createForUser({
+        userId,
+        title: 'Sincronización de recomendaciones terminada',
+        message:
+          `Clientes leídos: ${summary.extracted} (${summary.byAi} con IA). ` +
+          `Propiedades recalculadas: ${summary.propertiesRecomputed}, clientes: ${summary.clientsRecomputed}. ` +
+          `Recomendaciones nuevas: ${summary.created}, quitadas: ${summary.deleted}.` +
+          (summary.errors ? ` Errores: ${summary.errors} (ver logs).` : ''),
+        path: '/admin/propiedades/gestion',
+        actionType: NotificationActionType.NAVIGATE,
+        payload: { kind: 'matches-sync', summary },
+      });
+    } catch (error) {
+      this.logger.error(
+        `No se pudo notificar el fin de la sincronización: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
   /** Un cliente cambió su interés y ahora es ALTO para estas propiedades. */
   async notifyNewAltoForClient(
     clientId: string,

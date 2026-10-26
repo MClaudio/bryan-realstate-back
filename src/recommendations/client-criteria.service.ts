@@ -174,6 +174,30 @@ export const mergeAiCriteria = (
   return { criteria, rejected };
 };
 
+/** Cifras imposibles (no caben en la BD o son errores de lectura) se descartan. */
+export const sanitizeCriteria = (
+  criteria: ClientCriteriaData,
+): ClientCriteriaData => {
+  const amount = (v: number | null) =>
+    v !== null && Number.isFinite(v) && v > 0 && v < 1_000_000_000 ? v : null;
+  const minutes = criteria.maxMinutesCenter;
+  return {
+    ...criteria,
+    minLandM2: amount(criteria.minLandM2),
+    maxLandM2: amount(criteria.maxLandM2),
+    minConstructionM2: amount(criteria.minConstructionM2),
+    minBudgetUsd: amount(criteria.minBudgetUsd),
+    maxBudgetUsd: amount(criteria.maxBudgetUsd),
+    maxMinutesCenter:
+      minutes !== null &&
+      Number.isInteger(minutes) &&
+      minutes > 0 &&
+      minutes <= 600
+        ? minutes
+        : null,
+  };
+};
+
 /** Fila de la BD → criterios (Decimal → number). */
 export const criteriaFromRow = (row: ClientCriteria): ClientCriteriaData => {
   const num = (v: Prisma.Decimal | null) => (v === null ? null : Number(v));
@@ -206,6 +230,8 @@ export interface ExtractionSummary {
   aiCalls: number;
   aiFailed: number;
   cleared: number;
+  /** Clientes que no se pudieron guardar (se reintentan en la próxima sincronización). */
+  errors: number;
   /** Clientes cuyos criterios cambiaron (hay que recalcular sus matches). */
   changedClientIds: string[];
 }
@@ -317,6 +343,7 @@ export class ClientCriteriaService {
       aiCalls: 0,
       aiFailed: 0,
       cleared: 0,
+      errors: 0,
       changedClientIds: [],
     };
     if (clientIds.length === 0) return summary;
@@ -383,56 +410,64 @@ export class ClientCriteriaService {
     }
 
     for (const { client, text, rules } of pending) {
-      const raw = aiItems.get(client.id);
-      let criteria = rules.criteria;
-      let method = 'rules';
-      let aiNotes: string | null =
-        rules.ambiguities.length > 0
-          ? `Dudas sin IA: ${rules.ambiguities.join('; ')}`
-          : null;
-      if (raw) {
-        const merged = mergeAiCriteria(raw, rules, text, context);
-        criteria = merged.criteria;
-        method = 'ai';
-        aiNotes =
-          [
-            typeof raw.notes === 'string' ? raw.notes.trim() : '',
-            merged.rejected.length > 0
-              ? `Cifras descartadas: ${merged.rejected.join(', ')}`
-              : '',
-          ]
-            .filter(Boolean)
-            .join(' | ') || null;
-        if (merged.rejected.length > 0)
-          this.logger.warn(
-            `Criterios IA de ${client.id}: cifras que no están en el texto descartadas (${merged.rejected.join(', ')})`,
-          );
+      try {
+        const raw = aiItems.get(client.id);
+        let criteria = rules.criteria;
+        let method = 'rules';
+        let aiNotes: string | null =
+          rules.ambiguities.length > 0
+            ? `Dudas sin IA: ${rules.ambiguities.join('; ')}`
+            : null;
+        if (raw) {
+          const merged = mergeAiCriteria(raw, rules, text, context);
+          criteria = merged.criteria;
+          method = 'ai';
+          aiNotes =
+            [
+              typeof raw.notes === 'string' ? raw.notes.trim() : '',
+              merged.rejected.length > 0
+                ? `Cifras descartadas: ${merged.rejected.join(', ')}`
+                : '',
+            ]
+              .filter(Boolean)
+              .join(' | ') || null;
+          if (merged.rejected.length > 0)
+            this.logger.warn(
+              `Criterios IA de ${client.id}: cifras que no están en el texto descartadas (${merged.rejected.join(', ')})`,
+            );
+        }
+        criteria = sanitizeCriteria(criteria);
+        const criteriaHash = criteriaHashOf(criteria);
+        const data = {
+          ...criteria,
+          method,
+          extractorVersion: version,
+          sourceHash: sourceHashOf(client.interestDescription, client.notes),
+          criteriaHash,
+          aiNotes,
+          extractedAt: new Date(),
+        };
+        await this.prisma.clientCriteria.upsert({
+          where: { clientId: client.id },
+          create: { clientId: client.id, ...data },
+          update: data,
+        });
+        summary.extracted += 1;
+        if (method === 'ai') summary.byAi += 1;
+        else summary.byRules += 1;
+        if (client.criteria?.criteriaHash !== criteriaHash)
+          summary.changedClientIds.push(client.id);
+      } catch (error) {
+        summary.errors += 1;
+        this.logger.warn(
+          `No se pudieron guardar los criterios del cliente ${client.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
-      const criteriaHash = criteriaHashOf(criteria);
-      const data = {
-        ...criteria,
-        method,
-        extractorVersion: version,
-        sourceHash: sourceHashOf(client.interestDescription, client.notes),
-        criteriaHash,
-        aiNotes,
-        extractedAt: new Date(),
-      };
-      await this.prisma.clientCriteria.upsert({
-        where: { clientId: client.id },
-        create: { clientId: client.id, ...data },
-        update: data,
-      });
-      summary.extracted += 1;
-      if (method === 'ai') summary.byAi += 1;
-      else summary.byRules += 1;
-      if (client.criteria?.criteriaHash !== criteriaHash)
-        summary.changedClientIds.push(client.id);
     }
 
     if (summary.extracted > 0 || summary.cleared > 0)
       this.logger.log(
-        `Criterios: ${summary.extracted} extraído(s) (${summary.byRules} por reglas, ${summary.byAi} con IA en ${summary.aiCalls} llamada(s)), ${summary.cleared} sin interés`,
+        `Criterios: ${summary.extracted} extraído(s) (${summary.byRules} por reglas, ${summary.byAi} con IA en ${summary.aiCalls} llamada(s)), ${summary.cleared} sin interés, ${summary.errors} con error`,
       );
     return summary;
   }

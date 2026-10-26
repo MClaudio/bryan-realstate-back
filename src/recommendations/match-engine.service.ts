@@ -185,6 +185,15 @@ export class MatchEngineService {
       },
     });
 
+    if (
+      candidates.length === 0 &&
+      (await this.prisma.clientCriteria.count()) === 0
+    ) {
+      this.logger.warn(
+        'Ningún cliente tiene criterios leídos todavía: ejecuta POST /recommendations/sync (o espera la sincronización al arrancar / el cron).',
+      );
+    }
+
     const results = new Map<
       string,
       { result: MatchResult; clientVersion: string }

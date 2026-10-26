@@ -26,8 +26,9 @@ export class RecommendationsController {
    * recalcula lo afectado. Sirve para la carga inicial tras desplegar.
    */
   @Post('sync')
-  sync() {
-    return this.scheduler.runSync();
+  sync(@Req() req: { user?: { userId?: string } }) {
+    // En segundo plano: con muchos clientes tarda más que el timeout de la petición.
+    return this.scheduler.startInBackground(req.user?.userId ?? null);
   }
 
   /** Clientes recomendados (calculados por reglas) y descartados de una propiedad. */
