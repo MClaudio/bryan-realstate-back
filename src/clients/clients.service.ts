@@ -12,8 +12,12 @@ import { ContactAiParserService } from '../ai/contact-ai-parser.service';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { SyncContactsService } from '../sync-contacts/sync-contacts.service';
-import { formatPhoneNumber, validatePhoneNumber } from '../utils/phoneFormatter';
+import {
+  formatPhoneNumber,
+  validatePhoneNumber,
+} from '../utils/phoneFormatter';
 import { normalizeNamePair } from '../sync-contacts/utils/contact-normalization';
+import { RecommendationsQueueService } from '../recommendations/recommendations-queue.service';
 
 @Injectable()
 export class ClientsService {
@@ -21,6 +25,7 @@ export class ClientsService {
     private prisma: PrismaService,
     private syncContactsService: SyncContactsService,
     private contactAiParser: ContactAiParserService,
+    private recommendationsQueue: RecommendationsQueueService,
   ) {}
 
   /** Devuelve una sugerencia normalizada con IA de los datos del formulario. No guarda nada. */
@@ -37,7 +42,9 @@ export class ClientsService {
     });
 
     if (!contact) {
-      throw new ServiceUnavailableException(error ?? 'No se pudo normalizar con IA. Intenta nuevamente.');
+      throw new ServiceUnavailableException(
+        error ?? 'No se pudo normalizar con IA. Intenta nuevamente.',
+      );
     }
 
     return contact;
@@ -49,7 +56,9 @@ export class ClientsService {
         where: { email: createClientDto.email },
       });
       if (existingClient) {
-        throw new ConflictException(`Client with email ${createClientDto.email} already exists`);
+        throw new ConflictException(
+          `Client with email ${createClientDto.email} already exists`,
+        );
       }
     }
 
@@ -60,11 +69,13 @@ export class ClientsService {
 
     if (!validatePhoneNumber(createClientDto.phone)) {
       throw new BadRequestException(
-        'El número telefónico es inválido. Debe incluir código de país y tener al menos 7 dígitos (ej: +593978961341 o 0978961341)'
+        'El número telefónico es inválido. Debe incluir código de país y tener al menos 7 dígitos (ej: +593978961341 o 0978961341)',
       );
     }
 
-    const { formatted: formattedPhone } = formatPhoneNumber(createClientDto.phone);
+    const { formatted: formattedPhone } = formatPhoneNumber(
+      createClientDto.phone,
+    );
 
     const { password, ...clientData } = createClientDto;
     let passwordHash = undefined;
@@ -91,6 +102,14 @@ export class ClientsService {
 
     await this.syncContactsService.syncClientToGoogle(createdClient);
 
+    // Lee qué busca (reglas; IA solo si es ambiguo) y le busca propiedades en segundo plano.
+    if (
+      createdClient.interestDescription?.trim() ||
+      createdClient.notes?.trim()
+    ) {
+      await this.recommendationsQueue.enqueueClient(createdClient.id);
+    }
+
     return createdClient;
   }
 
@@ -104,9 +123,9 @@ export class ClientsService {
             id: true,
             firstName: true,
             lastName: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
   }
 
@@ -121,9 +140,9 @@ export class ClientsService {
             id: true,
             firstName: true,
             lastName: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
 
     if (!client) {
@@ -140,10 +159,17 @@ export class ClientsService {
     const { password, ...updateData } = updateClientDto;
     const data: any = { ...updateData };
 
-    if (updateData.firstName !== undefined || updateData.lastName !== undefined) {
+    if (
+      updateData.firstName !== undefined ||
+      updateData.lastName !== undefined
+    ) {
       const merged = normalizeNamePair(
-        updateData.firstName !== undefined ? updateData.firstName : client.firstName,
-        updateData.lastName !== undefined ? updateData.lastName : client.lastName,
+        updateData.firstName !== undefined
+          ? updateData.firstName
+          : client.firstName,
+        updateData.lastName !== undefined
+          ? updateData.lastName
+          : client.lastName,
       );
       data.firstName = merged.firstName;
       data.lastName = merged.lastName;
@@ -157,7 +183,7 @@ export class ClientsService {
 
       if (!validatePhoneNumber(updateData.phone)) {
         throw new BadRequestException(
-          'El número telefónico es inválido. Debe incluir código de país y tener al menos 7 dígitos (ej: +593978961341 o 0978961341)'
+          'El número telefónico es inválido. Debe incluir código de país y tener al menos 7 dígitos (ej: +593978961341 o 0978961341)',
         );
       }
 
@@ -174,6 +200,15 @@ export class ClientsService {
       where: { id },
       data,
     });
+
+    // Cambió lo que busca: se vuelven a leer sus criterios y a buscarle propiedades.
+    if (
+      (client.interestDescription ?? '') !==
+        (updatedClient.interestDescription ?? '') ||
+      (client.notes ?? '') !== (updatedClient.notes ?? '')
+    ) {
+      await this.recommendationsQueue.enqueueClient(id);
+    }
 
     if (updatedClient.googleContactId) {
       await this.syncContactsService.updateClientInGoogle({

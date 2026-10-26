@@ -63,6 +63,8 @@ model Client {
   interests              PropertyInterest[]
   recommendationFeedback RecommendationFeedback[]
   negotiatedProperties   Property[]
+  criteria               ClientCriteria?
+  matches                PropertyMatch[]
 
   @@map("clients")
 }
@@ -130,6 +132,7 @@ model Property {
   recommendationFeedback RecommendationFeedback[]
   checklistItems         PropertyChecklistItem[]
   saleProcess            SaleProcess?
+  matches                PropertyMatch[]
 
   @@index([code])
   @@index([cityId])
@@ -471,4 +474,82 @@ model Notification {
   @@index([userId, isRead, createdAt])
   @@index([entityType, entityId])
   @@map("notifications")
+}
+
+enum CriteriaIntent {
+  COMPRA
+  VENDE
+  OTRO
+}
+
+enum MatchLevel {
+  ALTO
+  MEDIO
+  BAJO
+}
+
+/// Criterios estructurados de lo que busca un cliente, extraídos de interest_description + notes
+/// (primero con reglas; con IA solo si el texto es ambiguo). Vacío / null = el cliente no lo dice.
+model ClientCriteria {
+  clientId          String         @id @map("client_id") @db.Uuid
+  intent            CriteriaIntent @default(COMPRA)
+  acceptedTypes     PropertyType[] @map("accepted_types")
+  /// "busca una propiedad / inmueble": acepta cualquier tipo, nunca ALTO
+  genericType       Boolean        @default(false) @map("generic_type")
+  /// Nombres exactos de la tabla cities
+  acceptedCities    String[]       @map("accepted_cities")
+  excludedCities    String[]       @map("excluded_cities")
+  acceptedSectors   String[]       @map("accepted_sectors")
+  maxMinutesCenter  Int?           @map("max_minutes_center")
+  nearCenter        Boolean        @default(false) @map("near_center")
+  minLandM2         Decimal?       @map("min_land_m2") @db.Decimal(12, 2)
+  maxLandM2         Decimal?       @map("max_land_m2") @db.Decimal(12, 2)
+  minConstructionM2 Decimal?       @map("min_construction_m2") @db.Decimal(12, 2)
+  minBudgetUsd      Decimal?       @map("min_budget_usd") @db.Decimal(12, 2)
+  maxBudgetUsd      Decimal?       @map("max_budget_usd") @db.Decimal(12, 2)
+  topographies      Topography[]
+  zones             Zone[]
+  requiredServices  String[]       @map("required_services")
+  uses              String[]
+  /// Características puntuales pedidas: dormitorios, jardín, parqueadero, frutales…
+  wantedFeatures    String[]       @map("wanted_features")
+  /// rules | ai
+  method            String
+  extractorVersion  String         @map("extractor_version")
+  /// Huella de interest_description + notes usados en la extracción
+  sourceHash        String         @map("source_hash")
+  /// Huella de los criterios: cambia solo si cambió lo que el cliente busca
+  criteriaHash      String         @map("criteria_hash")
+  /// criteriaHash + versión de reglas con que se calcularon sus matches (null = pendiente)
+  matchedHash       String?        @map("matched_hash")
+  aiNotes           String?        @map("ai_notes")
+  extractedAt       DateTime       @default(now()) @map("extracted_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  client            Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([intent])
+  @@map("client_criteria")
+}
+
+/// Coincidencias calculadas por reglas (sin IA) entre una propiedad y un cliente.
+model PropertyMatch {
+  propertyId      String     @map("property_id") @db.Uuid
+  clientId        String     @map("client_id") @db.Uuid
+  level           MatchLevel
+  score           Int
+  matched         String[]
+  unconfirmed     String[]
+  explanation     String
+  propertyVersion String     @map("property_version")
+  clientVersion   String     @map("client_version")
+  rulesVersion    String     @map("rules_version")
+  calculatedAt    DateTime   @default(now()) @map("calculated_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  property        Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  client          Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@id([propertyId, clientId])
+  @@index([propertyId, score(sort: Desc)])
+  @@index([clientId, score(sort: Desc)])
+  @@map("property_matches")
 }

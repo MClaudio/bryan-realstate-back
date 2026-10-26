@@ -10,7 +10,7 @@ const buildConfig = (enabled = true): AiConfig => ({
   maxRetries: 0,
   contactParser: { enabled, concurrency: 2, defaultCountry: 'EC' },
   propertyDescription: { enabled, temperature: 0.4, maxOutputTokens: 1500, autoGenerateOnSave: true },
-  recommendation: { enabled, model: "test-model", temperature: 0, maxOutputTokens: 2000, batchSize: 120, minScore: 60, timeoutMs: 1000 },
+  criteria: { enabled, model: "test-model", temperature: 0, maxOutputTokens: 4000, batchSize: 20, timeoutMs: 1000 },
 });
 
 const mockCompletion = (service: ContactAiParserService, content: string | null) => {

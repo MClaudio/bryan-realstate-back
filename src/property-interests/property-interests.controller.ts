@@ -8,16 +8,13 @@ import {
   Delete,
   UseGuards,
   Query,
-  Req,
   BadRequestException,
 } from '@nestjs/common';
 import { PropertyInterestsService } from './property-interests.service';
 import { CreatePropertyInterestDto } from './dto/create-property-interest.dto';
 import { UpdatePropertyInterestDto } from './dto/update-property-interest.dto';
-import { ReconcileRecommendationsDto } from './dto/reconcile-recommendations.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RecommendationFeedbackService } from './recommendation-feedback.service';
-import { RateRecommendationDto } from './dto/rate-recommendation.dto';
 
 @Controller('property-interests')
 @UseGuards(JwtAuthGuard)
@@ -27,7 +24,7 @@ export class PropertyInterestsController {
     private readonly feedbackService: RecommendationFeedbackService,
   ) {}
 
-  /** Calificaciones activas (like / dislike) de las recomendaciones IA de una propiedad. */
+  /** Calificaciones activas (like / dislike) de las recomendaciones de una propiedad. */
   @Get('feedback')
   getFeedback(@Query('propertyId') propertyId?: string) {
     if (!propertyId) throw new BadRequestException('propertyId es requerido');
@@ -45,32 +42,9 @@ export class PropertyInterestsController {
     return this.feedbackService.clear(propertyId, clientId);
   }
 
-  /** Like / dislike a una recomendación de la IA. */
-  @Post(':id/feedback')
-  rate(
-    @Param('id') id: string,
-    @Body() dto: RateRecommendationDto,
-    @Req() req: { user?: { userId?: string } },
-  ) {
-    return this.feedbackService.rate(id, dto, req.user?.userId ?? null);
-  }
-
   @Post()
   create(@Body() dto: CreatePropertyInterestDto) {
     return this.service.create(dto);
-  }
-
-  @Post('properties/:propertyId/reconcile')
-  reconcileRecommendations(
-    @Param('propertyId') propertyId: string,
-    @Body() dto: ReconcileRecommendationsDto,
-  ) {
-    // Candidatos de la IA confirmados en la vista: reemplaza solo los de origen IA.
-    return this.service.reconcileRecommendations(
-      propertyId,
-      dto.recommendations,
-      { mode: 'replaceAi' },
-    );
   }
 
   @Get()
