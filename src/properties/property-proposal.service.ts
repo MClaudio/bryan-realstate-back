@@ -3,7 +3,6 @@ import PDFDocument from 'pdfkit';
 import sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';
 import { FilesService } from '../files/files.service';
-import { getFormattedPhoneNumber } from '../utils/phoneFormatter';
 
 /**
  * Only client-safe fields. Internal data (minPrice, commission, owner, status,
@@ -27,9 +26,6 @@ export const proposalPropertySelect = {
   publicLongDescription: true,
   price: true,
   city: { select: { name: true } },
-  advisor: {
-    select: { firstName: true, lastName: true, email: true, phone: true },
-  },
   files: {
     where: { fileType: 'image' as const },
     orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }],
@@ -80,11 +76,7 @@ export interface ProposalData {
   characteristics: { label: string; value: string }[];
   indicators: { label: string; value: string }[];
   services: string[];
-  advisor?: {
-    name: string;
-    phone?: string | null;
-    email?: string | null;
-  } | null;
+  clientName?: string | null;
   coverImage?: Buffer | null;
   galleryImages: Buffer[];
   issuedAt: Date;
@@ -144,13 +136,27 @@ export class PropertyProposalService {
     private readonly filesService: FilesService,
   ) {}
 
-  async generate(id: string): Promise<{ buffer: Buffer; fileName: string }> {
+  async generate(
+    id: string,
+    clientId?: string,
+  ): Promise<{ buffer: Buffer; fileName: string }> {
     const property = await this.prisma.property.findFirst({
       where: { id, deletedAt: null },
       select: proposalPropertySelect,
     });
     if (!property)
       throw new NotFoundException(`Property with ID ${id} not found`);
+
+    let clientName: string | null = null;
+    if (clientId) {
+      const client = await this.prisma.client.findUnique({
+        where: { id: clientId },
+        select: { firstName: true, lastName: true },
+      });
+      if (!client)
+        throw new NotFoundException(`Client with ID ${clientId} not found`);
+      clientName = `${client.firstName} ${client.lastName}`.trim();
+    }
 
     const config = await this.prisma.configuration.findFirst({
       select: {
@@ -242,15 +248,7 @@ export class PropertyProposalService {
       characteristics,
       indicators,
       services: parseServices(property.basicServices),
-      advisor: property.advisor
-        ? {
-            name: `${property.advisor.firstName} ${property.advisor.lastName}`.trim(),
-            phone: property.advisor.phone
-              ? getFormattedPhoneNumber(property.advisor.phone)
-              : null,
-            email: property.advisor.email,
-          }
-        : null,
+      clientName,
       coverImage: photos[0] ?? null,
       galleryImages: photos.slice(1),
       issuedAt: new Date(),
@@ -405,6 +403,18 @@ export function buildProposalPdf(
         width,
         characterSpacing: 2,
       });
+    if (data.clientName) {
+      doc
+        .font('Helvetica-Oblique')
+        .fontSize(10)
+        .fillColor(COLORS.muted)
+        .text('Elaborada exclusivamente para', left, doc.y + 8, { width });
+      doc
+        .font('Helvetica-Bold')
+        .fontSize(16)
+        .fillColor(COLORS.accent)
+        .text(data.clientName, left, doc.y + 2, { width });
+    }
     doc
       .font('Helvetica-Bold')
       .fontSize(24)
@@ -582,42 +592,16 @@ export function buildProposalPdf(
       data.companyPhone,
       data.companyEmail,
     ].filter(Boolean) as string[];
-    const advisorLines = data.advisor
-      ? ([data.advisor.name, data.advisor.phone, data.advisor.email].filter(
-          Boolean,
-        ) as string[])
-      : [];
-    if (advisorLines.length || companyLines.length) {
-      ensureSpace(140);
+    if (companyLines.length) {
+      ensureSpace(100);
       heading('Contacto');
-      const colWidth = width / 2;
-      const startY = doc.y;
-      let maxY = startY;
-      [
-        { title: 'Asesor', lines: advisorLines },
-        { title: 'Empresa', lines: companyLines },
-      ]
-        .filter((block) => block.lines.length)
-        .forEach((block, c) => {
-          const x = left + c * colWidth;
-          doc
-            .font('Helvetica')
-            .fontSize(9)
-            .fillColor(COLORS.muted)
-            .text(block.title.toUpperCase(), x, startY, {
-              width: colWidth - 10,
-              characterSpacing: 1.2,
-            });
-          block.lines.forEach((line, i) => {
-            doc
-              .font(i === 0 ? 'Helvetica-Bold' : 'Helvetica')
-              .fontSize(10.5)
-              .fillColor(COLORS.text)
-              .text(line, x, doc.y + 3, { width: colWidth - 10 });
-          });
-          maxY = Math.max(maxY, doc.y);
-        });
-      doc.y = maxY;
+      companyLines.forEach((line, i) => {
+        doc
+          .font(i === 0 ? 'Helvetica-Bold' : 'Helvetica')
+          .fontSize(10.5)
+          .fillColor(COLORS.text)
+          .text(line, left, doc.y + 3, { width });
+      });
     }
 
     ensureSpace(30);
