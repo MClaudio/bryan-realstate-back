@@ -31,12 +31,6 @@ const baseProperty = {
   publicLongDescription: 'Descripción larga para el cliente.',
   price: 150000,
   city: { name: 'Cuenca' },
-  advisor: {
-    firstName: 'Ana',
-    lastName: 'Pérez',
-    email: 'ana@example.com',
-    phone: '0999999999',
-  },
   files: [
     { file: { id: 'img-1', path: '/uploads/a.png' } },
     { file: { id: 'img-2', path: '/uploads/broken.png' } },
@@ -48,6 +42,7 @@ describe('PropertyProposalService', () => {
   const prisma = {
     property: { findFirst: jest.fn() },
     configuration: { findFirst: jest.fn() },
+    client: { findUnique: jest.fn() },
   };
   const filesService = { getFileBuffer: jest.fn() };
   const service = new PropertyProposalService(
@@ -107,11 +102,32 @@ describe('PropertyProposalService', () => {
     prisma.property.findFirst.mockResolvedValue({
       ...baseProperty,
       files: [],
-      advisor: null,
     });
     prisma.configuration.findFirst.mockResolvedValue(null);
     const { buffer } = await service.generate('id-1');
     expect(buffer.subarray(0, 4).toString()).toBe('%PDF');
+  });
+
+  it('dedicates the proposal to a client by name only', async () => {
+    prisma.property.findFirst.mockResolvedValue(baseProperty);
+    prisma.client.findUnique.mockResolvedValue({
+      firstName: 'Luis',
+      lastName: 'Mora',
+    });
+    const { buffer } = await service.generate('id-1', 'client-1');
+    expect(buffer.subarray(0, 4).toString()).toBe('%PDF');
+    expect(prisma.client.findUnique).toHaveBeenCalledWith({
+      where: { id: 'client-1' },
+      select: { firstName: true, lastName: true },
+    });
+  });
+
+  it('throws 404 when the client does not exist', async () => {
+    prisma.property.findFirst.mockResolvedValue(baseProperty);
+    prisma.client.findUnique.mockResolvedValue(null);
+    await expect(service.generate('id-1', 'nope')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('throws 404 when the property does not exist', async () => {

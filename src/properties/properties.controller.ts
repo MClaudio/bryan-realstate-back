@@ -75,8 +75,15 @@ export class PropertiesController {
   /** PDF de propuesta de valor para el cliente (solo datos públicos, sin mapa ni redes). */
   @Get(':id/proposal-pdf')
   @UseGuards(JwtAuthGuard)
-  async proposalPdf(@Param('id') id: string, @Res() res: Response) {
-    const { buffer, fileName } = await this.proposalService.generate(id);
+  async proposalPdf(
+    @Param('id') id: string,
+    @Query('clientId') clientId: string | undefined,
+    @Res() res: Response,
+  ) {
+    const { buffer, fileName } = await this.proposalService.generate(
+      id,
+      clientId || undefined,
+    );
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename="${fileName}"`,
