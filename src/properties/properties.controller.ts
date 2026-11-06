@@ -4,6 +4,8 @@ import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
 import { UpdatePropertyDto } from './dto/update-property.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../profiles/permissions.guard';
+import { RequirePermission } from '../profiles/require-permission.decorator';
 import { GeneratePropertyDescriptionsDto } from './dto/generate-property-descriptions.dto';
 import { PropertyProposalService } from './property-proposal.service';
 
@@ -20,7 +22,7 @@ export class PropertiesController {
 
   /** Resolves a Google Maps short/full URL and returns extracted lat/lng */
   @Get('resolve-maps-url')
-  //@UseGuards(JwtAuthGuard)
+  //@UseGuards(JwtAuthGuard, PermissionsGuard)
   async resolveMapsUrl(@Query('url') url: string) {
     if (!url) throw new BadRequestException('url query param is required');
     return this.propertiesService.resolveMapsUrl(url);
@@ -28,19 +30,21 @@ export class PropertiesController {
 
   /** Genera con IA la descripción corta y larga pública con los datos del formulario (no guarda). */
   @Post('generate-descriptions')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   generateDescriptions(@Body() dto: GeneratePropertyDescriptionsDto) {
     return this.propertiesService.generatePublicDescriptions(dto);
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @RequirePermission('properties', 'create')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   create(@Body() createPropertyDto: CreatePropertyDto, @Req() req: any) {
     return this.propertiesService.create(createPropertyDto, this.getUserId(req));
   }
 
   @Get()
-  @UseGuards(JwtAuthGuard)
+  @RequirePermission('properties', 'access')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   findAll() {
     return this.propertiesService.findAll();
   }
@@ -56,13 +60,13 @@ export class PropertiesController {
   }
 
   @Get('cities')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   findCities() {
     return this.propertiesService.findCities();
   }
 
   @Get('current-sequence')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   getCurrentSequence() {
     return this.propertiesService.getCurrentSequence();
   }
@@ -74,7 +78,8 @@ export class PropertiesController {
 
   /** PDF de propuesta de valor para el cliente (solo datos públicos, sin mapa ni redes). */
   @Get(':id/proposal-pdf')
-  @UseGuards(JwtAuthGuard)
+  @RequirePermission('properties', 'print')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   async proposalPdf(
     @Param('id') id: string,
     @Query('clientId') clientId: string | undefined,
@@ -94,19 +99,22 @@ export class PropertiesController {
   }
 
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
+  @RequirePermission('properties', 'view', { orActions: ['edit'] })
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   findOne(@Param('id') id: string) {
     return this.propertiesService.findOne(id);
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  @RequirePermission('properties', 'edit')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   update(@Param('id') id: string, @Body() updatePropertyDto: UpdatePropertyDto, @Req() req: any) {
     return this.propertiesService.update(id, updatePropertyDto, this.getUserId(req));
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @RequirePermission('properties', 'delete')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   remove(@Param('id') id: string) {
     return this.propertiesService.remove(id);
   }

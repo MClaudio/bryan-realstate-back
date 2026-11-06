@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -29,12 +29,29 @@ export class UsersService {
 
     const { password, ...userData } = createUserDto;
 
-    return this.prisma.user.create({
+    // Sin perfil explícito, se asigna el perfil ADMIN por defecto.
+    if (!userData.profileId) {
+      const profile = await this.prisma.profile.findUnique({ where: { name: 'ADMIN' } });
+      userData.profileId = profile?.id;
+    } else {
+      await this.assertProfileUsable(userData.profileId);
+    }
+
+    const created = await this.prisma.user.create({
       data: {
         ...userData,
         password: passwordHash,
       },
     });
+    const { password: _hash, resetPasswordToken, resetPasswordExpires, ...safe } = created;
+    return safe;
+  }
+
+  private async assertProfileUsable(profileId: string) {
+    const profile = await this.prisma.profile.findUnique({ where: { id: profileId } });
+    if (!profile || !profile.isActive) {
+      throw new BadRequestException('El perfil seleccionado no existe o está inactivo');
+    }
   }
 
   async findAll() {
@@ -49,11 +66,22 @@ export class UsersService {
         address: true,
         ruc: true,
         type: true,
+        profileId: true,
+        profile: { select: { id: true, name: true } },
         isActive: true,
         hasChangedDefaultPassword: true,
         createdAt: true,
         updatedAt: true,
       },
+    });
+  }
+
+  /** Usuarios activos con solo id y nombre; sirve para seleccionar asesor sin exponer datos de Usuarios. */
+  async findAdvisors() {
+    return this.prisma.user.findMany({
+      where: { isActive: true },
+      select: { id: true, firstName: true, lastName: true },
+      orderBy: [{ firstName: 'asc' }, { lastName: 'asc' }],
     });
   }
 
@@ -80,10 +108,14 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) throw new NotFoundException(`User with ID ${id} not found`);
 
-    return this.prisma.user.update({
+    if (updateUserDto.profileId) await this.assertProfileUsable(updateUserDto.profileId);
+
+    const updated = await this.prisma.user.update({
       where: { id },
       data: { ...updateUserDto },
     });
+    const { password: _hash, resetPasswordToken, resetPasswordExpires, ...safe } = updated;
+    return safe;
   }
 
   async remove(id: string) {

@@ -2,6 +2,8 @@ import { Controller, Get, Post, Param, Delete, UseGuards, UseInterceptors, Uploa
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FilesService } from './files.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../profiles/permissions.guard';
+import { RequirePermission } from '../profiles/require-permission.decorator';
 import * as multer from 'multer';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -42,7 +44,7 @@ export class FilesController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -76,26 +78,28 @@ export class FilesController {
     return this.filesService.uploadFile(file, description).then((record) => this.filesService.enrichFile(record));
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Get()
+  @RequirePermission('files', 'access')
   findAll() {
     return this.filesService.findAll();
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.filesService.findOne(id);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Get(':id/url')
   getUrl(@Param('id') id: string, @Req() req: any) {
     return this.filesService.getUrl(id, req);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   @Delete(':id')
+  @RequirePermission('files', 'delete')
   remove(@Param('id') id: string) {
     return this.filesService.remove(id);
   }

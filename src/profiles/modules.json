@@ -1,0 +1,140 @@
+[
+  {
+    "key": "dashboard",
+    "label": "Dashboard",
+    "path": "/admin/dashboard",
+    "icon": "LayoutDashboard",
+    "inMenu": true,
+    "order": 1,
+    "actions": [
+      "access"
+    ]
+  },
+  {
+    "key": "users",
+    "label": "Usuarios",
+    "path": "/admin/usuarios",
+    "icon": "Users",
+    "inMenu": true,
+    "order": 2,
+    "actions": [
+      "access",
+      "create",
+      "edit",
+      "delete"
+    ]
+  },
+  {
+    "key": "profiles",
+    "label": "Perfiles",
+    "path": "/admin/perfiles",
+    "icon": "ShieldCheck",
+    "inMenu": true,
+    "order": 3,
+    "actions": [
+      "access",
+      "create",
+      "edit",
+      "delete"
+    ]
+  },
+  {
+    "key": "clients",
+    "label": "Clientes",
+    "path": "/admin/clientes",
+    "icon": "UserCheck",
+    "inMenu": true,
+    "order": 4,
+    "actions": [
+      "access",
+      "create",
+      "edit",
+      "delete",
+      "view"
+    ]
+  },
+  {
+    "key": "properties",
+    "label": "Propiedades",
+    "path": "/admin/propiedades/gestion",
+    "icon": "Building2",
+    "inMenu": true,
+    "order": 5,
+    "actions": [
+      "access",
+      "create",
+      "edit",
+      "delete",
+      "view",
+      "print"
+    ]
+  },
+  {
+    "key": "processes",
+    "label": "Procesos",
+    "path": "/admin/procesos",
+    "icon": "Workflow",
+    "inMenu": true,
+    "order": 6,
+    "actions": [
+      "access",
+      "create",
+      "edit",
+      "delete",
+      "view"
+    ]
+  },
+  {
+    "key": "files",
+    "label": "Archivos",
+    "path": "/admin/archivos",
+    "icon": "FolderOpen",
+    "inMenu": true,
+    "order": 7,
+    "actions": [
+      "access",
+      "create",
+      "edit",
+      "delete",
+      "view",
+      "download"
+    ]
+  },
+  {
+    "key": "blacklist",
+    "label": "Lista Negra",
+    "path": "/admin/lista-negra",
+    "icon": "ShieldX",
+    "inMenu": true,
+    "order": 8,
+    "actions": [
+      "access",
+      "create",
+      "edit",
+      "delete"
+    ]
+  },
+  {
+    "key": "configuration",
+    "label": "Configuración",
+    "path": "/admin/configuracion",
+    "icon": "Settings",
+    "inMenu": true,
+    "order": 9,
+    "actions": [
+      "access",
+      "edit"
+    ]
+  },
+  {
+    "key": "notifications",
+    "label": "Notificaciones",
+    "path": "/admin/notificaciones",
+    "icon": "Bell",
+    "inMenu": false,
+    "order": 10,
+    "actions": [
+      "access"
+    ]
+  }
+]

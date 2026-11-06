@@ -9,12 +9,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../profiles/permissions.guard';
+import { RequirePermission } from '../profiles/require-permission.decorator';
 import { RecommendationsService } from './recommendations.service';
 import { RateMatchDto } from './dto/rate-match.dto';
 import { RecommendationsSchedulerService } from './recommendations-scheduler.service';
 
 @Controller('recommendations')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
 export class RecommendationsController {
   constructor(
     private readonly service: RecommendationsService,
@@ -26,6 +28,7 @@ export class RecommendationsController {
    * recalcula lo afectado. Sirve para la carga inicial tras desplegar.
    */
   @Post('sync')
+  @RequirePermission('properties', 'edit')
   sync(@Req() req: { user?: { userId?: string } }) {
     // En segundo plano: con muchos clientes tarda más que el timeout de la petición.
     return this.scheduler.startInBackground(req.user?.userId ?? null);

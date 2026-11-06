@@ -4,6 +4,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   MinLength,
   MaxLength,
   Matches,
@@ -51,4 +52,8 @@ export class CreateUserDto {
   @IsEnum(UserType)
   @IsNotEmpty()
   type: UserType;
+
+  @IsUUID()
+  @IsOptional()
+  profileId?: string;
 }

@@ -1,12 +1,15 @@
 import { Body, Controller, Delete, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { SyncContactsService } from './sync-contacts.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../profiles/permissions.guard';
+import { RequirePermission } from '../profiles/require-permission.decorator';
 import { GoogleToDbSyncDto } from './dto/google-to-db-sync.dto';
 import { GoogleAuthCodeDto } from './dto/google-auth-code.dto';
 import { GooglePreviewResponse } from './sync-contacts.service';
 
 @Controller('sync')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermission('clients', 'create')
 export class SyncContactsController {
   constructor(private readonly syncContactsService: SyncContactsService) {}
 
