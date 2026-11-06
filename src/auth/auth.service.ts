@@ -9,6 +9,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
+import { ProfilesService } from '../profiles/profiles.service';
 
 @Injectable()
 export class AuthService {
@@ -18,6 +19,7 @@ export class AuthService {
     private configService: ConfigService,
     private emailService: EmailService,
     private prisma: PrismaService,
+    private profilesService: ProfilesService,
   ) {}
 
   private signAccessToken(payload: { username: string; sub: string; type: string }) {
@@ -81,8 +83,28 @@ export class AuthService {
     return {
       access_token: this.signAccessToken(payload),
       refresh_token: this.signRefreshToken(payload),
-      user,
+      user: this.stripSensitive(user),
+      profile: await this.profilesService.getUserProfile(user.id),
+      modules: this.profilesService.getModules(),
       first_login: !user.hasChangedDefaultPassword
+    };
+  }
+
+  private stripSensitive<T extends Record<string, any>>(user: T) {
+    const { resetPasswordToken, resetPasswordExpires, ...safe } = user;
+    return safe;
+  }
+
+  /** Usuario + perfil actuales (el frontend refresca permisos con esto). */
+  async me(userId: string) {
+    const user = await this.usersService.findOne(userId);
+    if ((user as any).isActive === false) {
+      throw new UnauthorizedException('Tu cuenta está desactivada. Contacta al administrador.');
+    }
+    return {
+      user: this.stripSensitive(user as any),
+      profile: await this.profilesService.getUserProfile(userId),
+      modules: this.profilesService.getModules(),
     };
   }
 

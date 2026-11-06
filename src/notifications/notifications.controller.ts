@@ -8,6 +8,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../profiles/permissions.guard';
+import { RequirePermission } from '../profiles/require-permission.decorator';
 import { NotificationsService } from './notifications.service';
 
 interface AuthenticatedRequest {
@@ -17,7 +19,8 @@ interface AuthenticatedRequest {
 }
 
 @Controller('notifications')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@RequirePermission('notifications', 'access')
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 

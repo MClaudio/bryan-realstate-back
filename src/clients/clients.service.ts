@@ -11,6 +11,7 @@ import { NormalizeClientDto } from './dto/normalize-client.dto';
 import { ContactAiParserService } from '../ai/contact-ai-parser.service';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
+import { Prisma } from '@prisma/client';
 import { SyncContactsService } from '../sync-contacts/sync-contacts.service';
 import {
   formatPhoneNumber,
@@ -113,20 +114,63 @@ export class ClientsService {
     return createdClient;
   }
 
-  async findAll() {
-    return this.prisma.client.findMany({
-      orderBy: { createdAt: 'desc' },
-      omit: { password: true },
-      include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
+  /**
+   * Sin `page`/`limit` devuelve el arreglo completo (selectores y otros módulos).
+   * Con `page` o `limit` devuelve `{ data, total, page, limit, totalPages }`.
+   */
+  async findAll(query: { page?: string; limit?: string; search?: string } = {}) {
+    const include = {
+      user: {
+        select: { id: true, firstName: true, lastName: true },
       },
+    };
+    const orderBy = { createdAt: 'desc' as const };
+
+    const paginated = query.page !== undefined || query.limit !== undefined;
+    const term = query.search?.trim();
+    // Cada palabra debe coincidir con nombre, apellido, email o teléfono.
+    const where: Prisma.ClientWhereInput | undefined = term
+      ? {
+          AND: term.split(/\s+/).map((part) => ({
+            OR: [
+              { firstName: { contains: part, mode: 'insensitive' as const } },
+              { lastName: { contains: part, mode: 'insensitive' as const } },
+              { email: { contains: part, mode: 'insensitive' as const } },
+              { phone: { contains: part } },
+            ],
+          })),
+        }
+      : undefined;
+
+    if (!paginated) {
+      return this.prisma.client.findMany({
+        where,
+        orderBy,
+        omit: { password: true },
+        include,
+      });
+    }
+
+    const limit = Math.min(
+      Math.max(parseInt(query.limit ?? '', 10) || 10, 1),
+      1000,
+    );
+    const requestedPage = Math.max(parseInt(query.page ?? '', 10) || 1, 1);
+
+    const total = await this.prisma.client.count({ where });
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const page = Math.min(requestedPage, totalPages);
+
+    const data = await this.prisma.client.findMany({
+      where,
+      orderBy,
+      omit: { password: true },
+      include,
+      skip: (page - 1) * limit,
+      take: limit,
     });
+
+    return { data, total, page, limit, totalPages };
   }
 
   async findOne(id: string) {

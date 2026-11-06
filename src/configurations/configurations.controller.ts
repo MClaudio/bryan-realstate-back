@@ -3,13 +3,16 @@ import { ConfigurationsService } from './configurations.service';
 import { CreateConfigurationDto } from './dto/create-configuration.dto';
 import { UpdateConfigurationDto } from './dto/update-configuration.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionsGuard } from '../profiles/permissions.guard';
+import { RequirePermission } from '../profiles/require-permission.decorator';
 
 @Controller('configuration')
 export class ConfigurationsController {
   constructor(private readonly configurationsService: ConfigurationsService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @RequirePermission('configuration', 'edit')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   create(@Body() createConfigurationDto: CreateConfigurationDto) {
     return this.configurationsService.create(createConfigurationDto);
   }
@@ -20,7 +23,8 @@ export class ConfigurationsController {
   }
 
   @Patch()
-  @UseGuards(JwtAuthGuard)
+  @RequirePermission('configuration', 'edit')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
   update(@Body() updateConfigurationDto: UpdateConfigurationDto) {
     return this.configurationsService.update(updateConfigurationDto);
   }

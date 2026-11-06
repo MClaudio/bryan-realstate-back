@@ -17,6 +17,7 @@ model User {
   address                   String?
   ruc                       String    @unique
   type                      UserType
+  profileId                 String?   @map("profile_id") @db.Uuid
   hasChangedDefaultPassword Boolean   @default(false) @map("has_changed_default_password")
   isActive                  Boolean   @default(true) @map("is_active")
   resetPasswordToken        String?   @map("reset_password_token")
@@ -30,8 +31,25 @@ model User {
   checkedChecklistItems  PropertyChecklistItem[]
   completedSaleStages    SaleProcessStage[]
   recommendationFeedback RecommendationFeedback[]
+  profile                Profile?                 @relation(fields: [profileId], references: [id])
 
   @@map("users")
+}
+
+/// Perfil = grupo de acceso. permissions: { [moduleKey]: { access, create, edit, view, print, download } }
+model Profile {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  description String?
+  isSystem    Boolean  @default(false) @map("is_system")
+  isActive    Boolean  @default(true) @map("is_active")
+  permissions Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users User[]
+
+  @@map("profiles")
 }
 
 enum NotificationActionType {
